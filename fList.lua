@@ -336,7 +336,7 @@ function addon:OnInitialize()
 	self.db = LibStub("AceDB-3.0"):New("fListDB")
 	self:Debug("fListDB loaded")
 
-	LibStub("AceConfig-3.0"):RegisterOptionsTable(addon.name, options, {self.name})
+	LibStub("AceConfig-3.0"):RegisterOptionsTable(self.name, options, {self.name})
 	self.BlizOptionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addon.name, self.name)
 
 	self:RegisterEvent("CHAT_MSG_WHISPER")
@@ -486,9 +486,6 @@ function addon:PARTY_MEMBERS_CHANGED()
 	self:Debug(tostring(GetNumPartyMembers()))
 	if GetNumPartyMembers() > 0 then
 		ConvertToRaid()
-		if UnitInRaid("player") then
-			self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
-		end
 	end
 end
 
@@ -504,7 +501,7 @@ function addon:StartList()
 	if self.db.global.currentlist == nil then
 		self.db.global.currentlist = {}
 		self:RegisterEvent("PARTY_MEMBERS_CHANGED")
-		self:Announce(self.db.global.announcement.message .. " /w " .. UnitName("player") .. " " .. self.db.global.prefix.invite)
+		self:Announce(self.db.global.announcement.message .. " /w " .. UnitName("player") .. " " .. self.db.global.prefix.list)
 	else
 		self:Print("List has already started.")
 	end
@@ -512,6 +509,8 @@ end
 
 function addon:CloseList()
 	if self.db.global.currentlist ~= nil then
+		self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
+		
 		if self.db.global.count == nil then
 			self.db.global.count = 0
 		end
@@ -536,7 +535,9 @@ function addon:TimeUp()
 	if self.db.global.currentlist ~= nil then
 		self:Debug("Expiring Invites...")
 		for name, info in pairs(self.db.global.currentlist) do
-			if info.accepted then
+			if UnitInRaid(name) then
+				self:UnlistPlayer(name)
+			elseif info.accepted then
 				if addon.Count - info.acceptedcount > 30 then
 					info.accepted = false
 					self:Whisper(name, "Your invite has expired.")
@@ -587,8 +588,11 @@ function addon:PrintList()
 end
 
 function addon:ListPlayer(name, whispertarget)
+	name = strtrim(name)
 	if self.db.global.currentlist == nil then
 		self:Whisper(whispertarget, "No list available.")
+	elseif UnitInRaid(name) then
+		self:Whisper(whispertarget, name .. " is already in the raid.")
 	elseif self.db.global.currentlist[name] == nil then
 		self.db.global.currentlist[name] = {
 			alt = "",
@@ -597,8 +601,9 @@ function addon:ListPlayer(name, whispertarget)
 			acceptedcount = 0,
 		}
 		self:Whisper(whispertarget, "You have been added to the list")
+		self:Print(name .. " has been added to the list")
 	else
-		self:Whisper(whispertarget, "[" .. name .. "] has already been added to the list")
+		self:Whisper(whispertarget, "[" .. name .. "] is already on the list")
 	end
 end
 
