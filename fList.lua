@@ -1,6 +1,6 @@
-fList = LibStub("AceAddon-3.0"):NewAddon("fList", "AceConsole-3.0", "AceEvent-3.0", "AceTimer-3.0")
+fList = LibStub("AceAddon-3.0"):NewAddon("fList", "AceConsole-3.0", "AceEvent-3.0", "AceTimer-3.0", "fLib")
 local addon = fList
-local NAME = "fList"
+local COMNAME = "fList"
 local DBNAME = "fListDB"
 local TIMER_INTERVAL = 10 --secs
 
@@ -317,7 +317,7 @@ local options = {
 --a filter handler to be called by the messsage event handler
 --return true causes the msg not to be displayed in the chat frame
 local function WhisperFilter(msg)
-	if strfind(msg, "%[" .. NAME .. "%]") == 1 then
+	if strfind(msg, "%[" .. COMNAME .. "%]") == 1 then
 		return true
 	elseif strfind(msg, addon.db.global.prefix.list) == 1 then
 		return true
@@ -369,54 +369,6 @@ function addon:OnDisable()
 	self:Debug("<<OnDisable>> start")
 end
 
---Outputs message to the chat window when debug is turned on
-function addon:Debug(msg)
-	if self.db.global.debug then
-		self:Print(tostring(msg))
-	end
-end
-
---Opens the blizz config window
-function addon:OpenConfig()
-	--Opens Ace config dialog
-	--LibStub("AceConfigDialog-3.0"):Open(addon.name)
-	--or
-	--Opens Blizz config dialog
-	InterfaceOptionsFrame_OpenToCategory(self.name)
-end
-
---Get handler for AceConfig
---Will get the stored value from AceDB
-function addon:GetOptions(info)
-	self:Debug("<<GetOptions>> start")
-	if info[#info - 1] == "fList" then
-		return self.db.global[info[#info]]
-	else
-		if self.db.global[info[#info-1]] == nil then
-			return nil
-		else
-			return self.db.global[info[#info-1]][info[#info]]
-		end
-	end
-	self:Debug("<<GetOptions>> end")
-end
-
---Set handler for AceConfig
---Will set the value to AceDB
-function addon:SetOptions(info, input)
-	self:Debug("<<SetOptions>> start")
-	if info[#info - 1] == nil then
-		self.db.global[info[#info]] = input
-		self:Debug("self.db.global." .. info[#info] .. "set to " .. tostring(input))
-	else
-		if self.db.global[info[#info-1]] == nil then
-			self.db.global[info[#info-1]] = {}
-		end
-		self.db.global[info[#info-1]][info[#info]] = input
-		self:Debug("self.db.global." .. info[#info-1] .. "." .. info[#info] .. "set to " .. tostring(input))
-	end
-	self:Debug("<<SetOptions>> end")
-end
 
 --CHAT_MSG_WHISPER handler
 function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
@@ -477,21 +429,6 @@ function addon:PARTY_MEMBERS_CHANGED()
 	if GetNumPartyMembers() > 0 then
 		ConvertToRaid()
 	end
-end
-
---Returns the 2nd word in the string
---multiple spaces count as only 1 space
-function addon:ParseName(str)
-	local words = {strsplit(" ", str)}
-	for idx,value in ipairs(words) do
-		if idx > 1 then
-			if value ~= "" then
-				return value
-			end
-		end
-	end
-	
-	return ""
 end
 
 --Returns true if there is a current list
@@ -799,9 +736,4 @@ function addon:CreateChatList(officer, guild, raid)
 	ChatList = strtrim(ChatList)
 	
 	return strsplit(" ", ChatList)
-end
-
-function addon:DisbandRaid()
-	SendChatMessage("Disbanding raid.", "RAID", nil, nil)
-	for M=1,GetNumRaidMembers() do UninviteUnit("raid"..M) end
 end
