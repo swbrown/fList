@@ -1,0 +1,7 @@
+## Interface: 30200
+## Title: fList
+## Description: Tamrah's list addon
+## SavedVariables: fListDB
+
+embeds.xml
+fList.lua
