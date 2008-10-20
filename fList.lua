@@ -56,8 +56,15 @@ local options = {
 			    	desc = 'Send an invite whisper to a player',
 			    	set = 'InvitePlayer',
 	    		},
-	    		disbandraid = {
+	    		removeplayer = {
 	    			order = 14,
+			    	type = 'input',
+			    	name = 'Remove Player',
+			    	desc = 'Remove a player from the list',
+			    	set = 'RemovePlayer',
+	    		},
+	    		disbandraid = {
+	    			order = 15,
 	    			type = 'execute',
 			    	name = 'Disband Raid',
 			    	desc = 'Disbands the current raid',
@@ -174,7 +181,7 @@ local options = {
 					order = 0,
 					type = 'input',
 					name = 'Message',
-					desc = 'Message for your list announcement',
+					desc = 'Message for your list announcement, /w currentplayer listprefix will be automatically appended to the message',
 					get = 'GetOptions',
 					set = 'SetOptions',
 				},
@@ -497,7 +504,7 @@ function addon:StartList()
 	if self.db.global.currentlist == nil then
 		self.db.global.currentlist = {}
 		self:RegisterEvent("PARTY_MEMBERS_CHANGED")
-		self:Announce(self.db.global.announcement.message .. "/w " .. UnitName("player") .. " " .. self.db.global.prefix.invite)
+		self:Announce(self.db.global.announcement.message .. " /w " .. UnitName("player") .. " " .. self.db.global.prefix.invite)
 	else
 		self:Print("List has already started.")
 	end
@@ -512,8 +519,10 @@ function addon:CloseList()
 			self.db.global.oldlist = {}
 		end
 		
-		self.db.global.count = self.db.global.count + 1
-		self.db.global.oldlist[self.db.global.count] = self.db.global.currentlist
+		if #self.db.global.currentlist > 0 then
+			self.db.global.count = self.db.global.count + 1
+			self.db.global.oldlist[self.db.global.count] = self.db.global.currentlist
+		end
 		self.db.global.currentlist = nil
 		self:Announce("Thank you for listing with " .. self.db.global.name .. ". The list is now closed.")
 	else
@@ -594,17 +603,24 @@ function addon:ListPlayer(name, whispertarget)
 end
 
 function addon:UnlistPlayer(name, whispertarget)
+	local msg = ""
 	if self.db.global.currentlist == nil then
-		self:Whisper(whispertarget, "No list available.")
+		msg = "No list available"
 	else
 		self.db.global.currentlist[name] = nil
-		self:Whisper(whispertarget, "You have been removed from the list")
+		msg = name .. " has been removed from the list"
+	end
+	
+	if whispertarget then
+		self:Whisper(whispertarget, msg)
+	else
+		self:Print(msg)
 	end
 end
 
 function addon:AltPlayer(name, alt, whispertarget)
 	if self.db.global.currentlist == nil then
-		self:Whisper(whispertarget, "No list available.")
+		self:Whisper(whispertarget, "No list available")
 	else
 		self.db.global.currentlist[name].alt = alt
 		self:Whisper(whispertarget, "[" .. alt .. "] has been added as your alt")
@@ -655,6 +671,10 @@ function addon:InvitePlayer(info, name)
 	else
 		self:Print("No name specified")
 	end
+end
+
+function addon:RemovePlayer(info, name)
+	self:UnlistPlayer(name)
 end
 
 function addon:Whisper(name, msg)
