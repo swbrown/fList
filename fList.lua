@@ -1,5 +1,8 @@
 fList = LibStub("AceAddon-3.0"):NewAddon("fList", "AceConsole-3.0", "AceEvent-3.0", "AceTimer-3.0")
 local addon = fList
+local NAME = "fList"
+local DBNAME = "fListDB"
+local TIMER_INTERVAL = 10 --secs
 
 local options = {
 	type='group',
@@ -311,9 +314,11 @@ local options = {
 	}
 }
 
+--a filter handler to be called by the messsage event handler
+--return true causes the msg not to be displayed in the chat frame
 local function WhisperFilter(msg)
-	if strfind(msg, "%[fList%]") == 1 then
-		return true, gsub(msg, "%[fList%]", "")
+	if strfind(msg, "%[" .. NAME .. "%]") == 1 then
+		return true
 	elseif strfind(msg, addon.db.global.prefix.list) == 1 then
 		return true
 	elseif strfind(msg, addon.db.global.prefix.unlist) == 1 then
@@ -332,66 +337,46 @@ local function WhisperFilter(msg)
 	--return false, gsub(msg, "lol", "")
 end
 
+--Required by AceAddon
+--self.db contains the AceDB which gives you access to saved variables
+--self.Count keeps track of how much time has passed, each count is one TIMER_INTERVAL
 function addon:OnInitialize()
-	self.db = LibStub("AceDB-3.0"):New("fListDB")
-	self:Debug("fListDB loaded")
-
+	self.db = LibStub("AceDB-3.0"):New(DBNAME)
+	self:Debug(DBNAME .. " loaded")
+	
 	LibStub("AceConfig-3.0"):RegisterOptionsTable(self.name, options, {self.name})
 	self.BlizOptionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addon.name, self.name)
-
+	
 	self:RegisterEvent("CHAT_MSG_WHISPER")
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", WhisperFilter)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", WhisperFilter)
-  
-  if false then
- 	if LibStub:GetLibrary("LibFuBarPlugin-3.0", true) then
- 		self:Debug("LibFuBarPlugin-3.0 present")
-		local LFBP = LibStub:GetLibrary("LibFuBarPlugin-3.0")
-		LibStub("AceAddon-3.0"):EmbedLibrary(self, "LibFuBarPlugin-3.0")
-		self:SetFuBarOption("tooltipType", "GameTooltip")
-		self:SetFuBarOption("hasNoColor", true)
-		self:SetFuBarOption("cannotDetachTooltip", true)
-		self:SetFuBarOption("hideWithoutStandby", true)
-		self:SetFuBarOption("iconPath", [[Interface\AddOns\Omen\icon]])
-		self:SetFuBarOption("hasIcon", true)
-		self:SetFuBarOption("defaultPosition", "RIGHT")
-		self:SetFuBarOption("tooltipHiddenWhenEmpty", true)
-		LFBP:OnEmbedInitialize(self)
-		function Omen:OnUpdateFuBarTooltip()
-			GameTooltip:AddLine("|cffffff00" .. L["Click|r to toggle the Omen window"])
-			GameTooltip:AddLine("|cffffff00" .. L["Right-click|r to open the options menu"])
-		end
-		function Omen:OnFuBarClick(button)
-			self:Toggle()
-		end
-		self.OpenMenu = self.ShowConfig
-		self.optionsFrames["FuBar"] = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("Omen", L["FuBar Options"], "Omen", "FuBar")
-		self:UpdateFuBarSettings()
-	end
-	end
 	
 	self.Count = 1
-	self.Timer = self:ScheduleRepeatingTimer(self["TimeUp"], 10, self)
+	self.Timer = self:ScheduleRepeatingTimer(self["TimeUp"], TIMER_INTERVAL, self)
 	
 	self:Debug("<<OnInitialize>> end")
 end
 
+--Called by AceAddon when addon enabled
 function addon:OnEnable()
 	self:Debug("<<OnEnable>> start")
 	
 	self:Debug("<<OnEnable>> end")
 end
 
+--Called by AceAddon when addon disabled
 function addon:OnDisable()
 	self:Debug("<<OnDisable>> start")
 end
 
+--Outputs message to the chat window when debug is turned on
 function addon:Debug(msg)
 	if self.db.global.debug then
 		self:Print(tostring(msg))
 	end
 end
 
+--Opens the blizz config window
 function addon:OpenConfig()
 	--Opens Ace config dialog
 	--LibStub("AceConfigDialog-3.0"):Open(addon.name)
@@ -400,6 +385,8 @@ function addon:OpenConfig()
 	InterfaceOptionsFrame_OpenToCategory(self.name)
 end
 
+--Get handler for AceConfig
+--Will get the stored value from AceDB
 function addon:GetOptions(info)
 	self:Debug("<<GetOptions>> start")
 	if info[#info - 1] == "fList" then
@@ -414,6 +401,8 @@ function addon:GetOptions(info)
 	self:Debug("<<GetOptions>> end")
 end
 
+--Set handler for AceConfig
+--Will set the value to AceDB
 function addon:SetOptions(info, input)
 	self:Debug("<<SetOptions>> start")
 	if info[#info - 1] == nil then
@@ -429,15 +418,15 @@ function addon:SetOptions(info, input)
 	self:Debug("<<SetOptions>> end")
 end
 
+--CHAT_MSG_WHISPER handler
 function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
+	msg = strtrim(msg)
 	self:Debug("<<CHAT_MSG_WHISPER>>" .. msg)
-
-	--self:Debug(eventName)
-	--self:Debug(msg)
-	--self:Debug(author)
-	--self:Debug(lang)
-	--self:Debug(status)
+	
 	if strfind(msg, self.db.global.prefix.list) == 1 then
+		--LIST whisper
+		--"list" main = author
+		--"list name" main = name, alt = author (for listing from an alt)
 		local main = author
 		local alt = ""
 		
@@ -446,69 +435,101 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 
 			main = self:ParseName(msg)
 			alt = author
-			
-			self:Debug("main=" .. main)
-			self:Debug("alt=" .. alt)
+			self:Debug("main=" .. main .. ",alt=" .. alt)
 		end
 		
 		self:ListPlayer(main, author)
-		
 		if #alt > 0 then
 			self:AltPlayer(main, alt, author)
 		end
 	elseif strfind(msg, self.db.global.prefix.unlist) == 1 then
+		--UNLIST whisper
+		--"unlist" main = author
+		--"unlist name" main = name (for unlisting from an alt)
 		local main = author
-
+		
 		if #msg > #self.db.global.prefix.unlist then
 			self:Debug(#msg .. ">" .. #self.db.global.prefix.unlist)
-
+			
 			main = self:ParseName(msg)
-
 			self:Debug("main=" .. main)
 		end
 		
 		self:UnlistPlayer(main, author)
 	elseif strfind(msg, self.db.global.prefix.alt) == 1 then
+		--ALT whisper
 		self:AltPlayer(author, self:ParseName(msg), author)
 	elseif strfind(msg, self.db.global.prefix.note) == 1 then
+		--NOTE whisper
 		self:NotePlayer(author, self:ParseName(msg), author)
 	elseif strfind(msg, self.db.global.prefix.invite) == 1 then
+		--INVITE whisper
 		self:AcceptInvite(author)
 	elseif strfind(msg, self.db.global.prefix.listrequest) == 1 then
-		addon:Debug(msg)
-		--do stuff
-		
+		--LISTREQUEST whisper
+		addon:Debug("LISTREQUEST is not implemented yet")
 	end
 end
 
+--PARTY_MEMBERS_CHANGED handler
 function addon:PARTY_MEMBERS_CHANGED()
-	self:Debug("<<PARTY_MEMBERS_CHANGED>>")
-	self:Debug(tostring(GetNumPartyMembers()))
+	self:Debug("<<PARTY_MEMBERS_CHANGED>>" .. tostring(GetNumPartyMembers()) .. " in the raid")
 	if GetNumPartyMembers() > 0 then
 		ConvertToRaid()
 	end
 end
 
+--Returns the 2nd word in the string
+--multiple spaces count as only 1 space
 function addon:ParseName(str)
-	prefix, name = strsplit(" ", str)
-	if name == nil then
-		return ""
+	local words = {strsplit(" ", str)}
+	for idx,value in ipairs(words) do
+		if idx > 1 then
+			if value ~= "" then
+				return value
+			end
+		end
 	end
-	return name
+	
+	return ""
 end
 
+--Returns true if there is a current list
+function addon:IsListOpen()
+	if self.db.global.currentlist then
+		return true
+	else
+		return false
+	end
+end
+
+--Returns true if name is on the list
+function addon:IsPlayerListed(name)
+	if self:IsListOpen() then
+		if self.db.global.currentlist[name] then
+			return true
+		end
+	end
+	return false
+end
+
+--Starts a new list
 function addon:StartList()
-	if self.db.global.currentlist == nil then
+	if self:IsListOpen() then
+		self:Print("List has already started")
+	else
 		self.db.global.currentlist = {}
 		self:RegisterEvent("PARTY_MEMBERS_CHANGED")
 		self:Announce(self.db.global.announcement.message .. " /w " .. UnitName("player") .. " " .. self.db.global.prefix.list)
-	else
-		self:Print("List has already started.")
+		self:Print("List started")
 	end
 end
 
+--Closes the current list
+--self.db.global.count keeps track of how many lists have been run
+--self.db.global.oldlist saves each list
 function addon:CloseList()
-	if self.db.global.currentlist ~= nil then
+	if self:IsListOpen() then
 		self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
 		
 		if self.db.global.count == nil then
@@ -524,34 +545,40 @@ function addon:CloseList()
 		end
 		self.db.global.currentlist = nil
 		self:Announce("Thank you for listing with " .. self.db.global.name .. ". The list is now closed.")
+		self:Print("List closed")
 	else
 		self:Print("No list to close.")
 	end
 end
 
+--Handler for our AceTimer repeating timer (created during initialization)
+--Increment self.Count
+--Clean up list
 function addon:TimeUp()
 	self:Debug("<<TimeUp>>")
 	self.Count = self.Count + 1
-	if self.db.global.currentlist ~= nil then
-		self:Debug("Expiring Invites...")
+	if self:IsListOpen() then
+		self:Debug("Cleaning up list...")
 		for name, info in pairs(self.db.global.currentlist) do
 			if UnitInRaid(name) then
+				--unlist players in raid
 				self:UnlistPlayer(name)
 			elseif info.accepted then
-				if addon.Count - info.acceptedcount > 30 then
-					info.accepted = false
-					self:Whisper(name, "Your invite has expired.")
+				--expire invites
+				if addon.Count - info.acceptedcount > self.db.global.timeout.invite * 60 / TIMER_INTERVAL then
+					self:ExpireInvite(name)
 				end
 			end
 		end
 	end
 end
 
+--Announces msg to specified chat and channels
 function addon:Announce(msg)
 	if msg == nil then
 		self:Print("No msg specified for announcement")
 	end
-	self:AnnounceInChannels(msg, strsplit("\n", self.db.global.announcement.channels))
+	self:AnnounceInChannels(msg, {strsplit("\n", self.db.global.announcement.channels)})
 	self:AnnounceInChat(msg,
 			self:CreateChatList(
 				self.db.global.announcement.officer,
@@ -559,57 +586,76 @@ function addon:Announce(msg)
 				self.db.global.announcement.raid))
 end
 
+--Prints the current list to specified chat and channels
 function addon:PrintList()
-	if self.db.global.currentlist == nil then
-		self:Print("No list available.")
-	else
-		fmt = "%-12s%-12s%-8s%s"
-		listmsg = string.format(fmt, "name", "alt", "invited", "note")
-		self:AnnounceInChannels(listmsg, strsplit("\n", self.db.global.printlist.channels))
-		self:AnnounceInChat(listmsg,
-			self:CreateChatList(
-				self.db.global.printlist.officer,
-				self.db.global.printlist.guild,
-				self.db.global.printlist.guild))
-		
-		for name, info in pairs(self.db.global.currentlist) do
-			if info.alt == nil then info.alt = "" end
-			if info.note == nil then info.note = "" end
-			if info.accepted == nil then info.accepted = false end
-			listmsg = string.format(fmt, name, info.alt, info.accepted and "yes" or "", info.note)
-			self:AnnounceInChannels(listmsg, strsplit("\n", self.db.global.printlist.channels))
+	if self:IsListOpen() then
+		if #self.db.global.currentlist == 0 then
+			self:AnnounceInChannels("List is empty", {strsplit("\n", self.db.global.printlist.channels)})
+			self:AnnounceInChat("List is empty",
+				self:CreateChatList(
+					self.db.global.printlist.officer,
+					self.db.global.printlist.guild,
+					self.db.global.printlist.raid))
+
+		else
+			fmt = "%-12s%-12s%-8s%s"
+			listmsg = string.format(fmt, "name", "alt", "invited", "note")
+			self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
 			self:AnnounceInChat(listmsg,
 				self:CreateChatList(
 					self.db.global.printlist.officer,
 					self.db.global.printlist.guild,
-					self.db.global.printlist.guild))
+					self.db.global.printlist.raid))
+			
+			for name, info in pairs(self.db.global.currentlist) do
+				if info.alt == nil then info.alt = "" end
+				if info.note == nil then info.note = "" end
+				if info.accepted == nil then info.accepted = false end
+				listmsg = string.format(fmt, name, info.alt, info.accepted and "yes" or "", info.note)
+				self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
+				self:AnnounceInChat(listmsg,
+					self:CreateChatList(
+						self.db.global.printlist.officer,
+						self.db.global.printlist.guild,
+						self.db.global.printlist.raid))
+			end
 		end
+	else
+		self:Print("No list available")
 	end
 end
 
+--List a new player and notifies whispertarget on success or failure
 function addon:ListPlayer(name, whispertarget)
-	name = strtrim(name)
-	if self.db.global.currentlist == nil then
-		self:Whisper(whispertarget, "No list available.")
+	local msg = ""
+	if not self:IsListOpen() then
+		msg = "No list available"
 	elseif UnitInRaid(name) then
-		self:Whisper(whispertarget, name .. " is already in the raid.")
-	elseif self.db.global.currentlist[name] == nil then
+		msg = name .. " is already in the raid"
+	elseif self:IsPlayerListed(name) then
+		msg = name .. " is already on the list"
+	else
 		self.db.global.currentlist[name] = {
 			alt = "",
 			note = "",
 			accepted = false,
 			acceptedcount = 0,
 		}
-		self:Whisper(whispertarget, "You have been added to the list")
-		self:Print(name .. " has been added to the list")
-	else
-		self:Whisper(whispertarget, "[" .. name .. "] is already on the list")
+		msg = name .. " have been added to the list"
 	end
+	
+	if whispertarget then
+		self:Whisper(whispertarget, msg)
+	else
+		self:Whisper(name, msg)
+	end
+	self:Print(msg)
 end
 
+--Unlist a player and notifies whispertarget
 function addon:UnlistPlayer(name, whispertarget)
 	local msg = ""
-	if self.db.global.currentlist == nil then
+	if not self:IsListOpen() then
 		msg = "No list available"
 	else
 		self.db.global.currentlist[name] = nil
@@ -619,77 +665,112 @@ function addon:UnlistPlayer(name, whispertarget)
 	if whispertarget then
 		self:Whisper(whispertarget, msg)
 	else
-		self:Print(msg)
+		self:Whisper(name, msg)
 	end
+	self:Print(msg)
 end
 
+--Set an alt for a player
 function addon:AltPlayer(name, alt, whispertarget)
-	if self.db.global.currentlist == nil then
+	if self:IsListOpen() then
+		if self:IsPlayerListed(name) then
+			self:Whisper(whispertarget, "You have not yet listed")
+		else
+			self.db.global.currentlist[name].alt = alt
+			self:Whisper(whispertarget, "Your alt has been sent to " .. alt)
+		end
+	else
 		self:Whisper(whispertarget, "No list available")
-	else
-		self.db.global.currentlist[name].alt = alt
-		self:Whisper(whispertarget, "[" .. alt .. "] has been added as your alt")
 	end
 end
 
+--Set a note for a player
 function addon:NotePlayer(name, note, whispertarget)
-	if self.db.global.currentlist == nil then
-		self:Whisper(whispertarget, "No list available.")
+	if self:IsListOpen() then
+		if self:IsPlayerListed(name) then
+			self:Whisper(whispertarget, "You have not yet listed")
+		else
+			self.db.global.currentlist[name].note = note
+			self:Whisper(whispertarget, "Your note has been set to " .. note)
+		end
 	else
-		self.db.global.currentlist[name].note = note
-		self:Whisper(whispertarget, "[" .. note .. "] has been set")
+		self:Whisper(whispertarget, "No list available")
 	end
 end
 
+--Invite a player to the raid
 function addon:AcceptInvite(name)
-	if self.db.global.currentlist == nil then
-		self:Whisper(name, "List is closed")
-	else
-		if self.db.global.currentlist[name] ~= nil then
+	if self:IsListOpen() then
+		if self:IsPlayerListed(name) then
 			if self.db.global.currentlist[name].accepted then
 				InviteUnit(name)
 			else
 				self:Whisper(name, "You have been caught trying to cheat!")
 			end
+		else
+			self:Whisper(name, "You have not yet listed")
+		end
+	else
+		self:Whisper(name, "List is closed")
+	end
+end
+
+--Expires a player's invite and whispers them
+function addon:ExpireInvite(name)
+	if self:IsListOpen() then
+		if self:IsPlayerListed(name) then
+			self.db.global.currentlist[name].accepted = false
+			self:Whisper(name, "Your invite has expired.")
+			if #self.db.global.currentlist[name].alt > 0 then
+				self:Whisper(self.db.global.currentlist[name].alt, "Your invite has expired.")
+			end
 		end
 	end
 end
 
+--Set handler for AceConfig
+--Notify a player that they have been accepted
 function addon:InvitePlayer(info, name)
 	self:Debug("Attempting to invite " .. name)
 	if name then
-		if self.db.global.currentlist == nil then
-			self:Print("No list available.")
-		else
-			if self.db.global.currentlist[name] == nil then
-				self:Print("Nobody by that name is listed")
-			else
+		if self:IsListOpent() then
+			if self:IsPlayerListed(name) then
 				self.db.global.currentlist[name].accepted = true
 				self.db.global.currentlist[name].acceptedcount = self.Count
-				local msg = "You have been accepted to the raid. /w " .. UnitName("player") .. " " .. self.db.global.prefix.invite .. " to recieve invite"
+				local msg = "You have been accepted to the raid. /w " .. 
+					UnitName("player") .. " " .. self.db.global.prefix.invite .. 
+					" to recieve invite.  Your invite will expre in " .. 
+					self.db.global.timeout.invite .. " minutes."
 				self:Whisper(name, msg)
 				if self.db.global.currentlist[name].alt ~= "" then
 					self:Whisper(self.db.global.currentlist[name].alt, msg)
 				end
+			else
+				self:Print("Nobody by that name is listed")
 			end
+		else
+			self:Print("No list available.")
 		end
-	else
-		self:Print("No name specified")
 	end
 end
 
+--Set handler for AceConfig
+--Will remove the player from the list
 function addon:RemovePlayer(info, name)
 	self:UnlistPlayer(name)
 end
 
+--Send a whisper
 function addon:Whisper(name, msg)
 	SendChatMessage("[fList]" .. msg, "WHISPER", nil, name)
 end
 
-function addon:AnnounceInChannels(msg, ...)
-	for i = 1, select("#", ...) do
-		local id = GetChannelName(select(i, ...))
-		SendChatMessage(msg, "CHANNEL", nil, id)
+function addon:AnnounceInChannels(msg, channels)
+	for idx,chan in ipairs(channels) do
+		local id = GetChannelName(chan)
+		if id > 0 then
+			SendChatMessage(msg, "CHANNEL", nil, id)
+		end
 	end
 end
 
