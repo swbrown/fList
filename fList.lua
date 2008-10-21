@@ -1,8 +1,7 @@
 fList = LibStub("AceAddon-3.0"):NewAddon("fList", "AceConsole-3.0", "AceEvent-3.0", "AceTimer-3.0", "fLib")
 local addon = fList
-local COMNAME = "fList"
 local DBNAME = "fListDB"
-local TIMER_INTERVAL = 10 --secs
+local TIMER_INTERVAL = 3 --secs
 
 local options = {
 	type='group',
@@ -317,7 +316,7 @@ local options = {
 --a filter handler to be called by the messsage event handler
 --return true causes the msg not to be displayed in the chat frame
 local function WhisperFilter(msg)
-	if strfind(msg, "%[" .. COMNAME .. "%]") == 1 then
+	if strfind(msg, "%[" .. addon.name .. "%]") == 1 then
 		return true
 	elseif strfind(msg, addon.db.global.prefix.list) == 1 then
 		return true
@@ -331,6 +330,19 @@ local function WhisperFilter(msg)
 		return true
 	elseif strfind(msg, addon.db.global.prefix.listrequest) == 1 then
 		return true
+	--elseif strfind(msg, "%[MegaelliAR%]") == 1 then
+		--special temporary stuff to do
+		--local wds = addon:ParseWords(msg, 7)
+		--if wds then
+		--	local name = wds[5]
+		--	local dkpparts = {strsplit(".", strsub(wds[7], 1, #wds[7]-1))}
+		--	addon:Print(name .. " hashas " .. dkpparts[1] .. " dkp")
+		--	fDKP:AddPlayer(name)
+		--	fDKP:SetDKP(name, tonumber(dkpparts[1]))
+		--else
+		--	addon:Print("wds is nil")
+		--end
+		--return false
 	end
 	
 	--you could change the msg also by doing
@@ -508,7 +520,14 @@ function addon:TimeUp()
 			end
 		end
 	end
+	
+	--tempidx = tempidx + 1
+	--if tempidx <= #tempnames then
+	--	self:Print("Whispering Megaelli raidpoints " .. tempnames[tempidx])
+	--	SendChatMessage("raidpoints " .. tempnames[tempidx], "WHISPER", nil, "Megaelli")
+	--end
 end
+
 
 --Announces msg to specified chat and channels
 function addon:Announce(msg)
@@ -526,40 +545,41 @@ end
 --Prints the current list to specified chat and channels
 function addon:PrintList()
 	if self:IsListOpen() then
-		if #self.db.global.currentlist == 0 then
-			self:AnnounceInChannels("List is empty", {strsplit("\n", self.db.global.printlist.channels)})
-			self:AnnounceInChat("List is empty",
-				self:CreateChatList(
-					self.db.global.printlist.officer,
-					self.db.global.printlist.guild,
-					self.db.global.printlist.raid))
-
-		else
-			fmt = "%-12s%-12s%-8s%s"
-			listmsg = string.format(fmt, "name", "alt", "invited", "note")
+		fmt = "%-12s%-12s%-8s%s"
+		listmsg = string.format(fmt, "name", "alt", "invited", "note")
+		self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
+		self:AnnounceInChat(listmsg,
+			self:CreateChatList(
+				self.db.global.printlist.officer,
+				self.db.global.printlist.guild,
+				self.db.global.printlist.raid))
+		
+		for name, info in pairs(self.db.global.currentlist) do
+			if info.alt == nil then info.alt = "" end
+			if info.note == nil then info.note = "" end
+			if info.accepted == nil then info.accepted = false end
+			listmsg = string.format(fmt, name, info.alt, info.accepted and "yes" or "", info.note)
 			self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
 			self:AnnounceInChat(listmsg,
 				self:CreateChatList(
 					self.db.global.printlist.officer,
 					self.db.global.printlist.guild,
 					self.db.global.printlist.raid))
-			
-			for name, info in pairs(self.db.global.currentlist) do
-				if info.alt == nil then info.alt = "" end
-				if info.note == nil then info.note = "" end
-				if info.accepted == nil then info.accepted = false end
-				listmsg = string.format(fmt, name, info.alt, info.accepted and "yes" or "", info.note)
-				self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
-				self:AnnounceInChat(listmsg,
-					self:CreateChatList(
-						self.db.global.printlist.officer,
-						self.db.global.printlist.guild,
-						self.db.global.printlist.raid))
-			end
 		end
 	else
 		self:Print("No list available")
 	end
+end
+
+--Returns the players in the current list in an array
+function addon:GetList()
+	local players = {}
+	if self:IsListOpen() then
+		for name, info in pairs(self.db.global.currentlist) do
+			players[#players+1] = name
+		end
+	end
+	return players
 end
 
 --List a new player and notifies whispertarget on success or failure
@@ -670,7 +690,7 @@ end
 function addon:InvitePlayer(info, name)
 	self:Debug("Attempting to invite " .. name)
 	if name then
-		if self:IsListOpent() then
+		if self:IsListOpen() then
 			if self:IsPlayerListed(name) then
 				self.db.global.currentlist[name].accepted = true
 				self.db.global.currentlist[name].acceptedcount = self.Count
@@ -695,11 +715,6 @@ end
 --Will remove the player from the list
 function addon:RemovePlayer(info, name)
 	self:UnlistPlayer(name)
-end
-
---Send a whisper
-function addon:Whisper(name, msg)
-	SendChatMessage("[fList]" .. msg, "WHISPER", nil, name)
 end
 
 function addon:AnnounceInChannels(msg, channels)

@@ -2,7 +2,7 @@
 ## Title: fList
 ## Description: Tamrah's list addon
 ## SavedVariables: fListDB
-## Dependencies: Ace3
+## Dependencies: Ace3, fLib
 
 embeds.xml
 fList.lua
