@@ -1,7 +1,10 @@
 fList = LibStub("AceAddon-3.0"):NewAddon("fList", "AceConsole-3.0", "AceEvent-3.0", "AceTimer-3.0", "fLib")
 local addon = fList
-local DBNAME = "fListDB"
-local TIMER_INTERVAL = 3 --secs
+local NAME = 'fList'
+local DBNAME = 'fListDB'
+local MYNAME = UnitName('player')
+
+local TIMER_INTERVAL = 10 --secs
 
 local options = {
 	type='group',
@@ -317,7 +320,11 @@ local options = {
 --return true causes the msg not to be displayed in the chat frame
 local function WhisperFilter(msg)
 	if strfind(msg, "%[" .. addon.name .. "%]") == 1 then
-		return true
+		if strfind(msg, MYNAME) then
+			return false
+		else
+			return true
+		end
 	elseif strfind(msg, addon.db.global.prefix.list) == 1 then
 		return true
 	elseif strfind(msg, addon.db.global.prefix.unlist) == 1 then
@@ -356,14 +363,16 @@ function addon:OnInitialize()
 	self.db = LibStub("AceDB-3.0"):New(DBNAME)
 	self:Debug(DBNAME .. " loaded")
 	
-	LibStub("AceConfig-3.0"):RegisterOptionsTable(self.name, options, {self.name})
-	self.BlizOptionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addon.name, self.name)
+	LibStub("AceConfig-3.0"):RegisterOptionsTable(NAME, options, {NAME})
+	self.BlizOptionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions(NAME, NAME)
 	
 	self:RegisterEvent("CHAT_MSG_WHISPER")
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", WhisperFilter)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", WhisperFilter)
 	
 	self.Count = 1
+	self.AnnouncementCount = 1
+	self.printlistcount = 1
 	self.Timer = self:ScheduleRepeatingTimer(self["TimeUp"], TIMER_INTERVAL, self)
 	
 	self:Debug("<<OnInitialize>> end")
@@ -384,52 +393,59 @@ end
 
 --CHAT_MSG_WHISPER handler
 function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
-	msg = strtrim(msg)
+	msg = strlower(strtrim(msg))
+	author = strlower(author)
 	self:Debug("<<CHAT_MSG_WHISPER>>" .. msg)
 	
-	if strfind(msg, self.db.global.prefix.list) == 1 then
+	local words = self:ParseWords(msg)
+	if #words < 1 then
+		return
+	end
+	
+	local cmd = words[1];
+	self:Debug("cmd=" .. cmd)
+	
+	if cmd == self.db.global.prefix.list then
 		--LIST whisper
 		--"list" main = author
 		--"list name" main = name, alt = author (for listing from an alt)
 		local main = author
 		local alt = ""
 		
-		if #msg > #self.db.global.prefix.list then
-			self:Debug(#msg .. ">" .. #self.db.global.prefix.list)
-
-			main = self:ParseName(msg)
+		if words[2] then
+			self:Debug("words[2]=" .. words[2])
+			main = words[2]
 			alt = author
-			self:Debug("main=" .. main .. ",alt=" .. alt)
 		end
 		
 		self:ListPlayer(main, author)
 		if #alt > 0 then
 			self:AltPlayer(main, alt, author)
 		end
-	elseif strfind(msg, self.db.global.prefix.unlist) == 1 then
+	elseif cmd == self.db.global.prefix.unlist then
 		--UNLIST whisper
 		--"unlist" main = author
 		--"unlist name" main = name (for unlisting from an alt)
 		local main = author
-		
-		if #msg > #self.db.global.prefix.unlist then
-			self:Debug(#msg .. ">" .. #self.db.global.prefix.unlist)
-			
-			main = self:ParseName(msg)
-			self:Debug("main=" .. main)
+		if words[2] then
+			self:Debug("words[2]=" .. words[2])
+			main = words[2]
 		end
-		
 		self:UnlistPlayer(main, author)
-	elseif strfind(msg, self.db.global.prefix.alt) == 1 then
+	elseif cmd == self.db.global.prefix.alt then
 		--ALT whisper
-		self:AltPlayer(author, self:ParseName(msg), author)
-	elseif strfind(msg, self.db.global.prefix.note) == 1 then
+		if words[2] then
+			self:AltPlayer(author, words[2], author)
+		end
+	elseif cmd == self.db.global.prefix.note then
 		--NOTE whisper
-		self:NotePlayer(author, self:ParseName(msg), author)
-	elseif strfind(msg, self.db.global.prefix.invite) == 1 then
+		if words[2] then
+			self:NotePlayer(author, words[2], author)
+		end
+	elseif cmd == self.db.global.prefix.invite then
 		--INVITE whisper
 		self:AcceptInvite(author)
-	elseif strfind(msg, self.db.global.prefix.listrequest) == 1 then
+	elseif cmd == self.db.global.prefix.listrequest then
 		--LISTREQUEST whisper
 		addon:Debug("LISTREQUEST is not implemented yet")
 	end
@@ -437,7 +453,7 @@ end
 
 --PARTY_MEMBERS_CHANGED handler
 function addon:PARTY_MEMBERS_CHANGED()
-	self:Debug("<<PARTY_MEMBERS_CHANGED>>" .. tostring(GetNumPartyMembers()) .. " in the raid")
+	self:Debug("<<PARTY_MEMBERS_CHANGED>>" .. tostring(GetNumPartyMembers()) .. " members in the raid")
 	if GetNumPartyMembers() > 0 then
 		ConvertToRaid()
 	end
@@ -469,14 +485,14 @@ function addon:StartList()
 	else
 		self.db.global.currentlist = {}
 		self:RegisterEvent("PARTY_MEMBERS_CHANGED")
-		self:Announce(self.db.global.announcement.message .. " /w " .. UnitName("player") .. " " .. self.db.global.prefix.list)
+		self:AnnounceList()
 		self:Print("List started")
 	end
 end
 
 --Closes the current list
 --self.db.global.count keeps track of how many lists have been run
---self.db.global.oldlist saves each list
+--self.db.global.oldlist is a list of old lists
 function addon:CloseList()
 	if self:IsListOpen() then
 		self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
@@ -488,6 +504,7 @@ function addon:CloseList()
 			self.db.global.oldlist = {}
 		end
 		
+		--save the list in self.db.global.oldlist
 		if #self.db.global.currentlist > 0 then
 			self.db.global.count = self.db.global.count + 1
 			self.db.global.oldlist[self.db.global.count] = self.db.global.currentlist
@@ -514,9 +531,25 @@ function addon:TimeUp()
 				self:UnlistPlayer(name)
 			elseif info.accepted then
 				--expire invites
-				if addon.Count - info.acceptedcount > self.db.global.timeout.invite * 60 / TIMER_INTERVAL then
+				if self.Count - info.acceptedcount > self.db.global.timeout.invite * 60 / TIMER_INTERVAL then
 					self:ExpireInvite(name)
 				end
+			end
+		end
+		
+		
+		if self.db.global.announcement.interval > 0 then
+			self:Debug("Announcement...")
+			if self.Count - self.announcementcount > self.db.global.announcement.interval * 60 / TIMER_INTERVAL then
+				self:AnnounceList()
+			end
+		end
+		
+		
+		if self.db.global.printlist.interval > 0 then
+			self:Debug("Print List...")
+			if self.Count - self.printlistcount > self.db.global.printlist.interval * 60 / TIMER_INTERVAL then
+				self:AnnounceList()
 			end
 		end
 	end
@@ -528,6 +561,10 @@ function addon:TimeUp()
 	--end
 end
 
+function addon:AnnounceList()
+	self:Announce(self.db.global.announcement.message .. " /w " .. MYNAME .. " " .. self.db.global.prefix.list)
+
+end
 
 --Announces msg to specified chat and channels
 function addon:Announce(msg)
@@ -545,8 +582,9 @@ end
 --Prints the current list to specified chat and channels
 function addon:PrintList()
 	if self:IsListOpen() then
+		--[[
 		fmt = "%-12s%-12s%-8s%s"
-		listmsg = string.format(fmt, "name", "alt", "invited", "note")
+		local listmsg = string.format(fmt, "name", "alt", "invited", "note")
 		self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
 		self:AnnounceInChat(listmsg,
 			self:CreateChatList(
@@ -566,6 +604,18 @@ function addon:PrintList()
 					self.db.global.printlist.guild,
 					self.db.global.printlist.raid))
 		end
+		--]]
+		
+		local listmsg = "Current list"
+		for name, info in pairs(self.db.global.currentlist) do
+			listmsg = listmsg .. name .. " "
+		end
+		self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
+		self:AnnounceInChat(listmsg,
+			self:CreateChatList(
+				self.db.global.printlist.officer,
+				self.db.global.printlist.guild,
+				self.db.global.printlist.raid))
 	else
 		self:Print("No list available")
 	end
@@ -598,7 +648,7 @@ function addon:ListPlayer(name, whispertarget)
 			accepted = false,
 			acceptedcount = 0,
 		}
-		msg = name .. " have been added to the list"
+		msg = name .. " has been added to the list"
 	end
 	
 	if whispertarget then
@@ -696,7 +746,7 @@ function addon:InvitePlayer(info, name)
 				self.db.global.currentlist[name].acceptedcount = self.Count
 				local msg = "You have been accepted to the raid. /w " .. 
 					UnitName("player") .. " " .. self.db.global.prefix.invite .. 
-					" to recieve invite.  Your invite will expre in " .. 
+					" to receive invite.  Your invite will expire in " .. 
 					self.db.global.timeout.invite .. " minutes."
 				self:Whisper(name, msg)
 				if self.db.global.currentlist[name].alt ~= "" then
