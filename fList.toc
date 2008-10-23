@@ -6,3 +6,4 @@
 
 embeds.xml
 fList.lua
+fListTablet.lua
