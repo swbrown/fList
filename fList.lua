@@ -2,14 +2,16 @@ fList = LibStub("AceAddon-3.0"):NewAddon("fList", "AceConsole-3.0", "AceEvent-3.
 local addon = fList
 local NAME = 'fList'
 local DBNAME = 'fListDB'
-local MYNAME = strlower(UnitName('player'))
 
 local TIMER_INTERVAL = 10 --secs
 local GUILD_ROSTER_INTERVAL = 50 --secs
 
+local CURRENTLIST = {}
+addon.CURRENTLIST = CURRENTLIST
+
 local options = {
 	type='group',
-	name = addon.name,
+	name = NAME,
 	handler = addon,
 	args = {
 		debug = {
@@ -320,8 +322,9 @@ local options = {
 --a filter handler to be called by the messsage event handler
 --return true causes the msg not to be displayed in the chat frame
 local function WhisperFilter(msg)
-	if strfind(msg, "%[" .. addon.name .. "%]") == 1 then
-		if strfind(msg, MYNAME) then
+	msg = strlower(strtrim(msg))
+	if strfind(msg, "%[" .. NAME .. "%]") == 1 then
+		if strfind(msg, strlower(UnitName('player'))) then
 			return false
 		else
 			return true
@@ -401,20 +404,45 @@ end
 function addon:TimeUp()
 	self:Debug("<<TimeUp>>")
 	self.Count = self.Count + 1
-	if self:IsListOpen() then
-		self:Debug("Cleaning up list...")
-		for name, info in pairs(self.db.global.currentlist) do
-			if UnitInRaid(name) then
-				--unlist players in raid
-				self:UnlistPlayer(name)
-			elseif info.invited then
-				--expire invites
-				if self.Count - info.invitedcount > self.db.global.timeout.invite * 60 / TIMER_INTERVAL then
-					self:ExpireInvite(name)
-				end
+	if CURRENTLIST.IsListOpen() then
+		if GUILD_ROSTER_INTERVAL > 0 then
+			self:Debug("Guild Roster...")
+			if self.Count - self.guildrostercount > GUILD_ROSTER_INTERVAL * 60 / TIMER_INTERVAL then
+				GuildRoster()
+				self.guildrostercount = self.Count
 			end
 		end
 		
+		self:Debug("Cleaning up list...")
+		for idx,info in ipairs(CURRENTLIST.GetList()) do
+			if UnitInRaid(info.name) then
+				--unlist players in raid
+				self:UnlistPlayer(info.name)
+			else
+				--update info to match guild roster
+				local rosterdata = fList.db.global.guildroster[strlower(info.name)]
+				if rosterdata then
+					info.rank = rosterdata.rank
+					info.rankIndex = rosterdata.rankIndex
+					info.level = rosterdata.level
+					info.class = rosterdata.class
+					info.zone = rosterdata.zone
+					if rosterdata.online then
+						info.online = 'yes'
+					else
+						info.online = 'no'
+					end
+					info.status = rosterdata.status
+					CURRENTLIST.SavePlayerInfo(info,false)
+				end
+				if info.invited then
+					--expire invites
+					if self.Count - info.invitedcount > self.db.global.timeout.invite * 60 / TIMER_INTERVAL then
+						self:ExpireInvite(info.name)
+					end
+				end
+			end
+		end
 		
 		if self.db.global.announcement.interval > 0 then
 			self:Debug("Announcement...")
@@ -424,20 +452,11 @@ function addon:TimeUp()
 			end
 		end
 		
-		
 		if self.db.global.printlist.interval > 0 then
 			self:Debug("Print List...")
 			if self.Count - self.printlistcount > self.db.global.printlist.interval * 60 / TIMER_INTERVAL then
 				self:AnnounceList()
 				self.printlistcount = self.Count
-			end
-		end
-		
-		if GUILD_ROSTER_INTERVAL > 0 then
-			self:Debug("Guild Roster...")
-			if self.Count - self.guildrostercount > GUILD_ROSTER_INTERVAL * 60 / TIMER_INTERVAL then
-				GuildRoster()
-				self.guildrostercount = self.Count
 			end
 		end
 	end
@@ -540,31 +559,149 @@ function addon:PARTY_MEMBERS_CHANGED()
 	end
 end
 
+--==============================================================================================
+--==============================================================================================
+--USE ONLY THESE FUNCTIONS TO ACCESS CURRENTLIST--
+--fList.db.global.currentlist
 --Returns true if there is a current list
-function addon:IsListOpen()
-	if self.db.global.currentlist then
+function CURRENTLIST.IsListOpen()
+	if fList.db.global.currentlist then
 		return true
 	else
 		return false
 	end
 end
 
---Returns true if name is on the list
-function addon:IsPlayerListed(name)
-	if self:IsListOpen() then
-		if self.db.global.currentlist[name] then
-			return true
+function CURRENTLIST.Count()
+	if fList.db.global.currentlist then
+		return #fList.db.global.currentlist
+	end
+	return 0
+end
+
+function CURRENTLIST.NewList()
+	fList.db.global.currentlist = {}
+	if fListTablet then
+		fListTablet:RefreshGUI()
+	end
+end
+
+function CURRENTLIST.ClearList()
+	fList.db.global.currentlist = nil
+	if fListTablet then
+		fListTablet:RefreshGUI()
+	end
+end
+
+function CURRENTLIST.GetList()
+	return	fList.db.global.currentlist
+end
+
+--Returns a player info table
+function CURRENTLIST.CreatePlayerInfo(name)
+	name = strlower(strtrim(name))
+	local capname = fList:Capitalize(name)
+	local newplayer = {
+		name = capname,
+		alt = '',
+		note = '',
+		invited = false,
+		invitedcount = 0,
+		rank = '',
+		rankIndex = 0,
+		level = 0,
+		class = '',
+		zone = '',
+		online = 'yes',
+		status = '',
+	}
+	if fList.db.global.guildroster[name] then
+		local rosterdata = fList.db.global.guildroster[name]
+		newplayer.rank = rosterdata.rank
+		newplayer.rankIndex = rosterdata.rankIndex
+		newplayer.level = rosterdata.level
+		newplayer.class = rosterdata.class
+		newplayer.zone = rosterdata.zone
+		if rosterdata.online then
+			newplayer.online = 'yes'
+		else
+			newplayer.online = 'no'
 		end
+		newplayer.status = rosterdata.status
+	end
+	return newplayer
+end
+
+--Returns true if successful
+--else false
+function CURRENTLIST.SavePlayerInfo(newplayerinfo, isnewplayer)
+	fList:Debug("<<SavePlayerInfo>>")
+	if isnewplayer == nil then
+		isnewplayer = true
+	end
+	if CURRENTLIST.IsListOpen() then
+		if isnewplayer then
+			for idx,info in ipairs(fList.db.global.currentlist) do
+				fList:Debug(idx .. " comparing " .. info.name .. ' with ' .. newplayerinfo.name)
+				if info.name == newplayerinfo.name then
+					fList:Debug("MATCH " .. info.name .. ' with ' .. newplayerinfo.name)
+					fList.db.global.currentlist.idx = newplayerinfo
+					if fListTablet then
+						fListTablet:RefreshGUI()
+					end
+					return true
+				end
+			end
+			fList.db.global.currentlist[#fList.db.global.currentlist + 1] = newplayerinfo
+		end
+		if fListTablet then
+			fListTablet:RefreshGUI()
+		end
+		return true
 	end
 	return false
 end
 
+--Returns a player info table
+--returns nil if no currentlist or player not listed
+--if you GetPlayerInfo then edit the info, be sure to SavePlayerInfo again, so the GUI is refreshed
+function CURRENTLIST.GetPlayerInfo(name)
+	if CURRENTLIST.IsListOpen() then
+		name = strlower(strtrim(name))
+		name = fList:Capitalize(name)
+		for idx,info in ipairs(fList.db.global.currentlist) do
+			if name ==  info.name then
+				return info
+			end
+		end
+	end
+	return nil
+end
+
+function CURRENTLIST.RemovePlayerInfo(name)
+	if CURRENTLIST.IsListOpen() then
+		name = strlower(strtrim(name))
+		name = fList:Capitalize(name)
+		for idx,info in ipairs(fList.db.global.currentlist) do
+			if name ==  info.name then
+				tremove(fList.db.global.currentlist, idx)
+				if fListTablet then
+					fListTablet:RefreshGUI()
+				end
+			end
+		end
+	end
+end
+--==============================================================================================
+--==============================================================================================
+
 --Starts a new list
+--self.db.global.currentlist is an array of player info tables
 function addon:StartList()
-	if self:IsListOpen() then
+	if CURRENTLIST.IsListOpen() then
 		self:Print("List has already started")
 	else
-		self.db.global.currentlist = {}
+		CURRENTLIST.NewList()
 		self:RegisterEvent("PARTY_MEMBERS_CHANGED")
 		self:AnnounceList()
 		self:Print("List started")
@@ -575,7 +712,7 @@ end
 --self.db.global.count keeps track of how many lists have been run
 --self.db.global.oldlist is a list of old lists
 function addon:CloseList()
-	if self:IsListOpen() then
+	if CURRENTLIST.IsListOpen() then
 		self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
 		
 		if self.db.global.count == nil then
@@ -586,11 +723,14 @@ function addon:CloseList()
 		end
 		
 		--save the list in self.db.global.oldlist
-		if #self.db.global.currentlist > 0 then
+		if CURRENTLIST.Count() > 0 then
 			self.db.global.count = self.db.global.count + 1
-			self.db.global.oldlist[self.db.global.count] = self.db.global.currentlist
+			self.db.global.oldlist[self.db.global.count] = CURRENTLIST.GetList()
 		end
-		self.db.global.currentlist = nil
+		CURRENTLIST.ClearList()
+		if fListTablet then
+			fListTablet:RefreshGUI()
+		end
 		self:Announce("Thank you for listing with " .. self.db.global.name .. ". The list is now closed.")
 		self:Print("List closed")
 	else
@@ -598,100 +738,30 @@ function addon:CloseList()
 	end
 end
 
-function addon:AnnounceList()
-	self:Announce(self.db.global.announcement.message .. " /w " .. MYNAME .. " " .. self.db.global.prefix.list)
-end
-
---Announces msg to specified chat and channels
-function addon:Announce(msg)
-	if msg == nil then
-		self:Print("No msg specified for announcement")
-	end
-	self:AnnounceInChannels(msg, {strsplit("\n", self.db.global.announcement.channels)})
-	self:AnnounceInChat(msg,
-			self:CreateChatList(
-				self.db.global.announcement.officer,
-				self.db.global.announcement.guild,
-				self.db.global.announcement.raid))
-end
-
---Prints the current list to specified chat and channels
-function addon:PrintList()
-	if self:IsListOpen() then
-		--TODO: sort list
-		local listmsg = "Current list: "
-		for name, info in pairs(self.db.global.currentlist) do
-			listmsg = listmsg .. name .. " "
-		end
-		self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
-		self:AnnounceInChat(listmsg,
-			self:CreateChatList(
-				self.db.global.printlist.officer,
-				self.db.global.printlist.guild,
-				self.db.global.printlist.raid))
-	else
-		self:Print("No list available")
-	end
-end
-
---Returns the players in the current list in an array
-function addon:GetList()
-	local players = {}
-	if self:IsListOpen() then
-		for name, info in pairs(self.db.global.currentlist) do
-			players[#players+1] = name
-		end
-	end
-	return players
-end
-
 --List a new player and notifies whispertarget on success or failure
 function addon:ListPlayer(name, whispertarget)
 	name = strlower(strtrim(name))
 	local capname = self:Capitalize(name)
-	whispertarget = strlower(strtrim(whispertarget))
+	whispertarget = strtrim(whispertarget)
 	
-	if name == MYNAME then
+	if name == strlower(UnitName('player')) then
 		self:Print("Why are you trying to list yourself?? You're the one running this list!!")
 		return
 	end
 	
 	local msg = ""
-	if not self:IsListOpen() then
+	if not CURRENTLIST.IsListOpen() then
 		msg = "No list available"
 	elseif UnitInRaid(name) then
 		msg = capname .. " is already in the raid"
-	elseif self:IsPlayerListed(name) then
-		msg = capname .. " is already on the list"
 	else
-		self.db.global.currentlist[name] = {
-			name = capname,
-			alt = '',
-			note = '',
-			invited = false,
-			invitedcount = 0,
-			rank = '',
-			rankIndex = 0,
-			level = 0,
-			class = '',
-			zone = '',
-			online = 1,
-			status = '',
-		}
-		if self.db.global.guildroster[name] then
-			local listdata = self.db.global.currentlist[name]
-			local rosterdata = self.db.global.guildroster[name]
-			listdata.rank = rosterdata.rank
-			listdata.rankIndex = rosterdata.rankIndex
-			listdata.level = rosterdata.level
-			listdata.class = rosterdata.class
-			listdata.zone = rosterdata.zone
-			listdata.online = rosterdata.online
-			listdata.status = rosterdata.status
-		end
-		msg = capname .. " has been added to the list"
-		if fListTablet then
-			fListTablet:RefreshGUI()
+		local info = CURRENTLIST.GetPlayerInfo(name)
+		if info then
+			msg = capname .. " is already on the list"
+		else
+			local newplayerinfo = CURRENTLIST.CreatePlayerInfo(name)
+			CURRENTLIST.SavePlayerInfo(newplayerinfo)
+			msg = capname .. " has been added to the list"
 		end
 	end
 	
@@ -715,14 +785,11 @@ function addon:UnlistPlayer(name, whispertarget)
 	local capname = self:Capitalize(name)
 	local msg = ""
 	
-	if not self:IsListOpen() then
+	if not CURRENTLIST.IsListOpen() then
 		msg = "No list available"
 	else
-		self.db.global.currentlist[name] = nil
+		CURRENTLIST.RemovePlayerInfo(name)
 		msg = capname .. " has been removed from the list"
-		if fListTablet then
-			fListTablet:RefreshGUI()
-		end
 	end
 	
 	if whispertarget then
@@ -735,22 +802,23 @@ end
 
 --Set an alt for a player
 function addon:AltPlayer(name, alt, whispertarget)
+	fList:Debug("<<AltPlayer>>" .. 'name=' ..name .. ' alt=' ..alt .. ' whispertarget=' .. whispertarget)
 	name = strlower(strtrim(name))
 	local capname = self:Capitalize(name)
 	alt = strlower(strtrim(alt))
 	local capalt = self:Capitalize(alt)
 	whispertarget = strlower(strtrim(whispertarget))
 
-	if self:IsListOpen() then
-		if self:IsPlayerListed(name) then
+	if CURRENTLIST.IsListOpen() then
+		local info = CURRENTLIST.GetPlayerInfo(name)
+		if not info then
 			self:Whisper(whispertarget, capname .. " has not listed yet")
-		else
-			self.db.global.currentlist[name].alt = alt
-			self:Whisper(whispertarget, capname .. "'s alt has been sent to " .. capalt)
-			if fListTablet then
-				fListTablet:RefreshGUI()
-			end
+			return
 		end
+		
+		info.alt = alt
+		CURRENTLIST.SavePlayerInfo(info, false)
+		self:Whisper(whispertarget, capname .. "'s alt has been sent to " .. capalt)
 	else
 		self:Whisper(whispertarget, "No list available")
 	end
@@ -762,18 +830,17 @@ function addon:NotePlayer(name, note, whispertarget)
 	local capname = self:Capitalize(name)
 	whispertarget = strlower(strtrim(whispertarget))
 	
-	if self:IsListOpen() then
-		if self:IsPlayerListed(name) then
+	if CURRENTLIST.IsListOpen() then
+		local info = CURRENTLIST.GetPlayerInfo(name)
+		if not info then
 			self:Whisper(whispertarget, capname .. " has not listed yet")
-		else
-			--replace % so that note doens't break my tablet in fLibTablet.lua
-			note = gsub(note, '%%', '*')
-			self.db.global.currentlist[name].note = note
-			self:Whisper(whispertarget, capname .. "'s note has been set to " .. note)
-			if fListTablet then
-				fListTablet:RefreshGUI()
-			end
+			return
 		end
+		--replace % so that note doens't break my tablet in fLibTablet.lua
+		note = gsub(note, '%%', '*')
+		info.note = note
+		CURRENTLIST.SavePlayerInfo(info, false)
+		self:Whisper(whispertarget, capname .. "'s note has been set to " .. note)
 	else
 		self:Whisper(whispertarget, "No list available")
 	end
@@ -784,15 +851,17 @@ function addon:AcceptInvite(name)
 	name = strlower(strtrim(name))
 	local capname = self:Capitalize(name)
 	
-	if self:IsListOpen() then
-		if self:IsPlayerListed(name) then
-			if self.db.global.currentlist[name].invited then
-				InviteUnit(name)
-			else
-				self:Whisper(name, capname .. " does not have an open invite")
-			end
+	if CURRENTLIST.IsListOpen() then
+		local info = CURRENTLIST.GetPlayerInfo(name)
+		if not info then
+			self:Whisper(name, capname .. " has not listed yet")
+			return
+		end
+		
+		if info.invited then
+			InviteUnit(name)
 		else
-			self:Whisper(name, capname .. " has not yet listed")
+			self:Whisper(name, capname .. " does not have an open invite")
 		end
 	else
 		self:Whisper(name, "List is closed")
@@ -804,16 +873,17 @@ function addon:ExpireInvite(name)
 	name = strlower(strtrim(name))
 	local capname = self:Capitalize(name)
 	
-	if self:IsListOpen() then
-		if self:IsPlayerListed(name) then
-			self.db.global.currentlist[name].invited = false
-			self:Whisper(name, capname .. "'s invite has expired")
-			if #self.db.global.currentlist[name].alt > 0 then
-				self:Whisper(self.db.global.currentlist[name].alt, capname .. "'s invite has expired.")
-			end
-			if fListTablet then
-				fListTablet:RefreshGUI()
-			end
+	if CURRENTLIST.IsListOpen() then
+		local info = CURRENTLIST.GetPlayerInfo(name)
+		if not info then
+			return
+		end
+		
+		info.invited = false
+		CURRENTLIST.SavePlayerInfo(info, false)
+		self:Whisper(name, capname .. "'s invite has expired")
+		if #info.alt > 0 then
+			self:Whisper(info.alt, capname .. "'s invite has expired.")
 		end
 	end
 end
@@ -827,36 +897,84 @@ end
 function addon:InvitePlayer(name)
 	self:Debug("Attempting to invite " .. name)
 	if name then
-		if self:IsListOpen() then
+		if CURRENTLIST.IsListOpen() then
 			name = strlower(strtrim(name))
 			local capname = self:Capitalize(name)
 			
-			if self:IsPlayerListed(name) then
-				self.db.global.currentlist[name].invited = true
-				self.db.global.currentlist[name].invitedcount = self.Count
-				local msg = capname .. "has been accepted to the raid. /w " .. 
-					MYNAME .. " " .. self.db.global.prefix.invite .. 
+			local info = CURRENTLIST.GetPlayerInfo(name)
+			if not info then
+				self:Print(capname .. " has not yet listed")
+				return
+			end
+			
+			info.invited = true
+			info.invitedcount = self.Count
+			CURRENTLIST.SavePlayerInfo(info, false)
+			local msg = capname .. "has been accepted to the raid. /w " .. 
+					UnitName('player') .. " " .. self.db.global.prefix.invite .. 
 					" to receive invite.  Your invite will expire in " .. 
 					self.db.global.timeout.invite .. " minutes."
-				if fListTablet then
-					fListTablet:RefreshGUI()
-				end
-				if self.db.global.currentlist[name].online == 1 then
-					--check if player online, then accept and whisper
-					self:Whisper(name, msg)
-				else
-					--send whisper to alt
-					if self.db.global.currentlist[name].alt ~= "" then
-						self:Whisper(self.db.global.currentlist[name].alt, msg)
-					end
-				end
+			
+			if info.online == 1 then
+				--check if player online, then accept and whisper
+				self:Whisper(name, msg)
 			else
-				self:Print(capname .. " has not yet listed")
+				--send whisper to alt
+				if info.alt ~= "" then
+					self:Whisper(info.alt, msg)
+				end
 			end
 		else
 			self:Print("No list available.")
 		end
 	end
+end
+
+function addon:AnnounceList()
+	self:Announce(self.db.global.announcement.message .. " /w " .. UnitName('player') .. " " .. self.db.global.prefix.list)
+end
+
+--Announces msg to specified chat and channels
+function addon:Announce(msg)
+	if msg == nil then
+		self:Print("No msg specified for announcement")
+	end
+	self:AnnounceInChannels(msg, {strsplit("\n", self.db.global.announcement.channels)})
+	self:AnnounceInChat(msg,
+			self:CreateChatList(
+				self.db.global.announcement.officer,
+				self.db.global.announcement.guild,
+				self.db.global.announcement.raid))
+end
+
+--Prints the current list to specified chat and channels
+function addon:PrintList()
+	if CURRENTLIST.IsListOpen() then
+		--TODO: sort list
+		local listmsg = "Current list: "
+		for idx, info in ipairs(CURRENTLIST.GetList()) do
+			listmsg = listmsg .. info.name .. " "
+		end
+		self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
+		self:AnnounceInChat(listmsg,
+			self:CreateChatList(
+				self.db.global.printlist.officer,
+				self.db.global.printlist.guild,
+				self.db.global.printlist.raid))
+	else
+		self:Print("No list available")
+	end
+end
+
+--Returns the players in the current list in an array
+function addon:GetList()
+	local players = {}
+	if CURRENTLIST.IsListOpen() then
+		for idx, info in ipairs(CURRENTLIST.GetList()) do
+			players[#players+1] = info.name
+		end
+	end
+	return players
 end
 
 function addon:AnnounceInChannels(msg, channels)

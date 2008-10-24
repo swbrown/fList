@@ -1,9 +1,12 @@
+--http://old.wowace.com/wiki/Tablet-2.0
+
 fListTablet = LibStub("AceAddon-3.0"):NewAddon("fListTablet", "AceConsole-3.0", "AceEvent-3.0", "fLib")
 local addon = fListTablet
 local NAME = 'fListTablet'
 local MYNAME = UnitName('player')
 
 local tablet = AceLibrary('Tablet-2.0')
+local dew = AceLibrary("Dewdrop-2.0")
 
 local tablet_data = {
 	detached = true,
@@ -14,7 +17,12 @@ local tablet_data = {
 --Required by AceAddon
 function addon:OnInitialize()
 	self:RegisterGUI()
-	
+	dew:Register(NAME..'RightClickMenu',
+		'children', function()
+			dew:AddLine('text', "Text")
+		end,
+		'cursorX', true, 'cursorY', true
+	)
 	self:Debug("<<OnInitialize>> end")
 end
 
@@ -28,37 +36,6 @@ end
 --Called by AceAddon when addon disabled
 function addon:OnDisable()
 	self:Debug("<<OnDisable>> start")
-end
-
--- and tablet:AddLine
---make sure no nils inside values, messes things up
-local function MakeLine(data)
-	local str = ""
-	for idx, val in ipairs(columnnames) do
-		if idx == 1 then
-			idx = ''
-		end
-		str = str .. 'text' .. idx .. '%' .. tostring(data[val]) --.. '%'
-		--str = str .. 'text' .. idx .. 'R', 1, 'text' .. idx .. 'G', 0.6, 'text' .. idx .. 'B', 0
-		if idx == '' or idx < #columnnames then
-		 	str = str .. '%'
-		 end
-	end
-	--strtrim(str)
-	print(strsplit('%', str))
-	local ttt  = {strsplit('%', str)}
-	print(#ttt)
-	return strsplit('%', str)
-end
-
-local function MakeHighlight()
-	local str = ""
-	for idx, val in ipairs(columnnames) do
-		if idx == 1 then
-			idx = ''
-		end
-		str = str .. 'text' .. idx .. 'R%1%text' .. idx .. 'G%1%text' .. idx .. 'B%.5%'
-	end
 end
 
 local SORT = 1
@@ -76,24 +53,75 @@ local columnnames = {
 }
 
 local function compare1(p1, p2)
+	fList:Debug('<<compare1>> SORT=' .. SORT)
+	if p1== nil or p2 == nil then
+		return true
+	end
+	local column = columnnames[SORT]
 	
+	if p1[column] == p2[column] then
+		return p1.name < p2.name
+	else
+		
+		return p1[column] < p2[column]
+	end
 end
 
-local function SortCurentPlayers()
-	if fList then
-		table.sort(fList.db.global.currentlist, 
+local function SortCurrentPlayers()
+	if fList and fList.CURRENTLIST.IsListOpen() then
+		table.sort(fList.CURRENTLIST.GetList(), compare1) 
 	end
+end
+
+local function ClickPlayer(idx, info)
+	print(idx)
+	print(info)
+	dew:Open(NAME .. 'RightClickMenu')
+end
+
+local function CreateDewMenu()
+	local dewmenu = {}
+	
+	if fList then
+		dewmenu.fList = {
+	        text = "fList",
+	        func = function() if fList then fList:OpenConfig() end end,
+	        hasArrow = true,
+	        subMenu = {
+	            Apple = {
+	                text = "A juicy apple",
+	                func = function()
+	                	fLib:Print("You clicked a juicy apple")
+	                	fListTablet:ShowGUI()
+	                end,
+	            },
+	            Strawberry = {
+	                text = "A tasty strawberry", 
+	                func = function()
+	                	fLib:Print("You clicked a tasty strawberry")
+	                	fListTablet:HideGUI()
+	                end,
+	            },
+	        }
+	     }
+	end
+	
+	if fDKP then
+		dewmenu.fDKP = {
+	        text = "fDKP",
+	        func = function() if fDKP then fDKP:OpenConfig() end end,
+	    }
+	end
+	
+	return dewmenu
 end
 
 function addon:RegisterGUI()
 	if not tablet:IsRegistered(NAME) then
+		SortCurrentPlayers()
 		tablet:Register(NAME, 'detachedData', tablet_data,
-			'Strata', 'DIALOG',
-			'minWidth', 50,
-			'maxHeight', 650,
-			'canAttach', false,
-			'dontHook', true,
-			'showTitleWhenDetached', true,
+			'strata', "HIGH", 'maxHeight', 850,
+			'cantAttach', true, 'dontHook', true, 'showTitleWhenDetached', true,
 			'children', function()
 				tablet:SetTitle('Current List')
 				
@@ -105,7 +133,16 @@ function addon:RegisterGUI()
 				
 				local cat = tablet:AddCategory(
 				    'columns', 10,
-				    'func', function() SORT = columnnames[SORT+1] and SORT+1 or 1 self:RefreshGUI()  end,
+				    'showWithoutChildren', true,
+				    'func', function()
+				    	if IsShiftKeyDown() then
+				    		SORT = columnnames[SORT-1] and SORT-1 or 10
+				    	else
+				    		SORT = columnnames[SORT+1] and SORT+1 or 1
+				    	end
+				    	SortCurrentPlayers()
+				    	self:RefreshGUI()
+				    end,
 				    'text', 'name',
 					'text2', 'level',
 					'text3', 'class',
@@ -137,21 +174,27 @@ function addon:RegisterGUI()
 				local G = 1
 				local B = 1
 				
-				if fList then
-					for idx,data in pairs(fList.db.global.currentlist) do
+				if fList and fList.CURRENTLIST.IsListOpen() then
+					if fList.CURRENTLIST.Count() == 0 then
+						cat:AddLine('text', 'List is empty')
+					end
+					for idx,info in ipairs(fList.CURRENTLIST.GetList()) do
 						cat:AddLine(
+							'func', ClickPlayer,
+							'arg1', idx,
+							'arg2', info,
 							'hasCheck', true,
-							'checked', data.invited,
-							'text', data.name,
-							'text2', data.level,
-							'text3', data.class,
-							'text4', data.alt,
-							'text5', data.note,
-							'text6', data.rank,
-							'text7', data.rankIndex,
-							'text8', data.zone,
-							'text9', data.online,
-							'text10', data.status,
+							'checked', info.invited,
+							'text', info.name,
+							'text2', info.level,
+							'text3', info.class,
+							'text4', info.alt,
+							'text5', info.note,
+							'text6', info.rank,
+							'text7', info.rankIndex,
+							'text8', info.zone,
+							'text9', info.online,
+							'text10', info.status,
 							'textR', R, 'textG', G, 'textB', B,
 							'text2R', R, 'text2G', G, 'text2B', B,
 							'text3R', R, 'text3G', G, 'text3B', B,
@@ -167,6 +210,8 @@ function addon:RegisterGUI()
 						 	highlight..'B', .5
 						)
 					end
+				else
+					cat:AddLine('text', 'List is closed')
 				end
 			end
 		)
@@ -182,6 +227,7 @@ function addon:ShowGUI()
 	tablet:Open(guiname)
 	--]]
 	if tablet:IsRegistered(NAME) then
+		SortCurrentPlayers()
 		tablet:Open(NAME)
 	else
 		self:Print(NAME .. ' is not a registered tablet')
@@ -209,7 +255,6 @@ function addon:RefreshGUI()
 	tablet:Refresh(guiname)
 	--]]
 	if tablet:IsRegistered(NAME) then
-		SortCurentPlayers()
 		tablet:Refresh(NAME)
 	else
 		self:Print(NAME .. ' is not a registered tablet')
