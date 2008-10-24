@@ -30,6 +30,7 @@ local options = {
 	    	func = 'OpenConfig',
 	    	guiHidden = true,
 	    },
+	    --[[
 	    action = {
 	    	order = 10,
 	    	type = 'group',
@@ -80,6 +81,7 @@ local options = {
 	    		},
 	    	},
 	    },
+	    --]]
 		name = {
 			order = 20,
 			type = 'input',
@@ -316,6 +318,26 @@ local options = {
 				},
 			},
 		},
+		help = {
+			order = 40,
+			type = 'group',
+			name = 'Help',
+			desc = 'Info on how to use this addon.',
+			args = {
+				text1 = {
+					order = 0,
+					type = 'description',
+					name = [[Click on players in the list to see a menu of options.
+Shift-Click to invite.
+Ctrl-Click to remove.
+
+Columns can be sorted by clicking on the column header line.
+Click to sort next column.
+Shift-Click to sort current column.
+Ctrl-Click to sort previous column.]]
+				},
+			},
+		}
 	}
 }
 
@@ -324,7 +346,9 @@ local options = {
 local function WhisperFilter(msg)
 	msg = strlower(strtrim(msg))
 	if strfind(msg, "%[" .. NAME .. "%]") == 1 then
+		msg = gsub(msg, strlower('/w ' .. MYNAME), '')
 		if strfind(msg, strlower(UnitName('player'))) then
+			--if it STILL contains my name, let the whisper through
 			return false
 		else
 			return true
@@ -374,6 +398,14 @@ function addon:OnInitialize()
 	self:RegisterEvent("CHAT_MSG_WHISPER")
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", WhisperFilter)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", WhisperFilter)
+	
+	if CURRENTLIST.IsListOpen() then
+		self:RegisterEvent("PARTY_MEMBERS_CHANGED")
+	end
+	
+	if fListTablet then
+		addon.GUI = fListTablet
+	end
 	
 	self.Count = 1
 	self.announcementcount = 1
@@ -435,6 +467,9 @@ function addon:TimeUp()
 					info.status = rosterdata.status
 					CURRENTLIST.SavePlayerInfo(info,false)
 				end
+				
+				--TODO: remove players from list if offline for too long
+				
 				if info.invited then
 					--expire invites
 					if self.Count - info.invitedcount > self.db.global.timeout.invite * 60 / TIMER_INTERVAL then
@@ -581,15 +616,15 @@ end
 
 function CURRENTLIST.NewList()
 	fList.db.global.currentlist = {}
-	if fListTablet then
-		fListTablet:RefreshGUI()
+	if addon.GUI then
+		addon.GUI:Refresh()
 	end
 end
 
 function CURRENTLIST.ClearList()
 	fList.db.global.currentlist = nil
-	if fListTablet then
-		fListTablet:RefreshGUI()
+	if addon.GUI then
+		addon.GUI:Refresh()
 	end
 end
 
@@ -646,16 +681,16 @@ function CURRENTLIST.SavePlayerInfo(newplayerinfo, isnewplayer)
 				if info.name == newplayerinfo.name then
 					fList:Debug("MATCH " .. info.name .. ' with ' .. newplayerinfo.name)
 					fList.db.global.currentlist.idx = newplayerinfo
-					if fListTablet then
-						fListTablet:RefreshGUI()
+					if addon.GUI then
+						addon.GUI:Refresh()
 					end
 					return true
 				end
 			end
 			fList.db.global.currentlist[#fList.db.global.currentlist + 1] = newplayerinfo
 		end
-		if fListTablet then
-			fListTablet:RefreshGUI()
+		if addon.GUI then
+			addon.GUI:Refresh()
 		end
 		return true
 	end
@@ -685,8 +720,8 @@ function CURRENTLIST.RemovePlayerInfo(name)
 		for idx,info in ipairs(fList.db.global.currentlist) do
 			if name ==  info.name then
 				tremove(fList.db.global.currentlist, idx)
-				if fListTablet then
-					fListTablet:RefreshGUI()
+				if addon.GUI then
+					addon.GUI:Refresh()
 				end
 			end
 		end
@@ -728,9 +763,6 @@ function addon:CloseList()
 			self.db.global.oldlist[self.db.global.count] = CURRENTLIST.GetList()
 		end
 		CURRENTLIST.ClearList()
-		if fListTablet then
-			fListTablet:RefreshGUI()
-		end
 		self:Announce("Thank you for listing with " .. self.db.global.name .. ". The list is now closed.")
 		self:Print("List closed")
 	else
@@ -910,12 +942,12 @@ function addon:InvitePlayer(name)
 			info.invited = true
 			info.invitedcount = self.Count
 			CURRENTLIST.SavePlayerInfo(info, false)
-			local msg = capname .. "has been accepted to the raid. /w " .. 
+			local msg = capname .. " has been accepted to the raid. /w " .. 
 					UnitName('player') .. " " .. self.db.global.prefix.invite .. 
 					" to receive invite.  Your invite will expire in " .. 
 					self.db.global.timeout.invite .. " minutes."
 			
-			if info.online == 1 then
+			if info.online == 'yes' then
 				--check if player online, then accept and whisper
 				self:Whisper(name, msg)
 			else
@@ -951,10 +983,14 @@ end
 function addon:PrintList()
 	if CURRENTLIST.IsListOpen() then
 		--TODO: sort list
-		local listmsg = "Current list: "
+		local listmsg = ''--"Current list: "
 		for idx, info in ipairs(CURRENTLIST.GetList()) do
 			listmsg = listmsg .. info.name .. " "
 		end
+		if listmsg == '' then
+			listmsg = 'empty...'
+		end
+		listmsg = 'Current list: ' .. listmsg
 		self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
 		self:AnnounceInChat(listmsg,
 			self:CreateChatList(

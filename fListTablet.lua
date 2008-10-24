@@ -17,12 +17,6 @@ local tablet_data = {
 --Required by AceAddon
 function addon:OnInitialize()
 	self:RegisterGUI()
-	dew:Register(NAME..'RightClickMenu',
-		'children', function()
-			dew:AddLine('text', "Text")
-		end,
-		'cursorX', true, 'cursorY', true
-	)
 	self:Debug("<<OnInitialize>> end")
 end
 
@@ -73,47 +67,28 @@ local function SortCurrentPlayers()
 	end
 end
 
-local function ClickPlayer(idx, info)
-	print(idx)
-	print(info)
-	dew:Open(NAME .. 'RightClickMenu')
-end
-
-local function CreateDewMenu()
-	local dewmenu = {}
-	
-	if fList then
-		dewmenu.fList = {
-	        text = "fList",
-	        func = function() if fList then fList:OpenConfig() end end,
-	        hasArrow = true,
-	        subMenu = {
-	            Apple = {
-	                text = "A juicy apple",
-	                func = function()
-	                	fLib:Print("You clicked a juicy apple")
-	                	fListTablet:ShowGUI()
-	                end,
-	            },
-	            Strawberry = {
-	                text = "A tasty strawberry", 
-	                func = function()
-	                	fLib:Print("You clicked a tasty strawberry")
-	                	fListTablet:HideGUI()
-	                end,
-	            },
-	        }
-	     }
+--info - the clicked player info
+local function ClickPlayer(info)
+	if IsShiftKeyDown() then
+		fList:InvitePlayer(info.name)
+	elseif IsControlKeyDown() then
+		fList:UnlistPlayer(info.name, info.name)
+	else
+		dew:Open(NAME..'RightClickMenu',
+			'cursorX', true,
+			'cursorY', true,
+			"children", function()
+				dew:FeedTable({
+					Invite = {
+						text = "Invite",
+	        			func = function() fList:InvitePlayer(info.name) end,},
+					Remove = {
+						text = "Remove",
+						func = function() fList:UnlistPlayer(info.name, info.name) end,}
+				})
+			end
+		)
 	end
-	
-	if fDKP then
-		dewmenu.fDKP = {
-	        text = "fDKP",
-	        func = function() if fDKP then fDKP:OpenConfig() end end,
-	    }
-	end
-	
-	return dewmenu
 end
 
 function addon:RegisterGUI()
@@ -121,27 +96,56 @@ function addon:RegisterGUI()
 		SortCurrentPlayers()
 		tablet:Register(NAME, 'detachedData', tablet_data,
 			'strata', "HIGH", 'maxHeight', 850,
-			'cantAttach', true, 'dontHook', true, 'showTitleWhenDetached', true,
+			'cantAttach', true,
+			'dontHook', true,
+			'showTitleWhenDetached', true,
+			--'showHintWhenDetached', true,
 			'children', function()
-				tablet:SetTitle('Current List')
+				print('in register children f unction')
+				local cat
+				tablet:SetTitle('fList')
 				
+				--Menu at the top
+				cat = tablet:AddCategory('columns', 1)
+				local x = 'Start List'
+				if fList.CURRENTLIST.IsListOpen() then x = 'Close List' end
+				cat:AddLine(
+					'text', x,
+					'justify', "RIGHT",
+					'func', function()
+						if fList.CURRENTLIST.IsListOpen() then
+							fList:CloseList()
+						else
+							fList:StartList()
+						end
+					end)
+				
+				if UnitInRaid('player') then
+					cat:AddLine(
+						'text', 'Disband Raid',
+						'justify', 'RIGHT',
+						'func', function() fList:DisbandRaid() fListTablet:Refresh() end
+					)
+				end
+				--Current List
 				local highlight = 'text'
 				if SORT ~= 1 then
 					highlight = highlight .. SORT
 				end
-				addon:Print('highlight=' .. highlight)
 				
-				local cat = tablet:AddCategory(
+				cat = tablet:AddCategory(
 				    'columns', 10,
 				    'showWithoutChildren', true,
+				    'hideBlankLine', true,
 				    'func', function()
 				    	if IsShiftKeyDown() then
+				    	elseif IsControlKeyDown() then
 				    		SORT = columnnames[SORT-1] and SORT-1 or 10
 				    	else
 				    		SORT = columnnames[SORT+1] and SORT+1 or 1
 				    	end
 				    	SortCurrentPlayers()
-				    	self:RefreshGUI()
+				    	fListTablet:Refresh()
 				    end,
 				    'text', 'name',
 					'text2', 'level',
@@ -181,8 +185,7 @@ function addon:RegisterGUI()
 					for idx,info in ipairs(fList.CURRENTLIST.GetList()) do
 						cat:AddLine(
 							'func', ClickPlayer,
-							'arg1', idx,
-							'arg2', info,
+							'arg1', info,
 							'hasCheck', true,
 							'checked', info.invited,
 							'text', info.name,
@@ -213,28 +216,46 @@ function addon:RegisterGUI()
 				else
 					cat:AddLine('text', 'List is closed')
 				end
+				
+				--Menu at the bottom
+				cat = tablet:AddCategory('columns', 1)
+				if fList.CURRENTLIST.IsListOpen() then
+					cat:AddLine('text', 'Print List', 'func', function() fList:PrintList() end)
+				end
+				cat:AddLine('text', 'Config', 'func', function() fList:OpenConfig() end)
+				--cat:AddLine('text', "Close", 'func', function() fListTablet:Hide() end)  -- WTF
+				--this close button doesnt' work
+				--when i reopent tablet its empty... don't know why.....
 			end
 		)
 	end
 end
 
+local isopen = false
+function addon:Toggle()
+	if isopen then
+		addon:Hide()
+	else
+		addon:Show()
+	end
+end
 
-function addon:ShowGUI()
+
+function addon:Show()
 	--[[
 	if not tablet:IsRegistered(guiname) then
-		self:RegisterGUI()
+		self:Register()
 	end
 	tablet:Open(guiname)
 	--]]
 	if tablet:IsRegistered(NAME) then
 		SortCurrentPlayers()
 		tablet:Open(NAME)
-	else
-		self:Print(NAME .. ' is not a registered tablet')
+		isopen = true
 	end
 end
 
-function addon:HideGUI()
+function addon:Hide()
 	--[[
 	if tablet:IsRegistered(guiname) then
 		tablet:Close(guiname)
@@ -242,12 +263,11 @@ function addon:HideGUI()
 	--]]
 	if tablet:IsRegistered(NAME) then
 		tablet:Close(NAME)
-	else
-		self:Print(NAME .. ' is not a registered tablet')
+		isopen = false
 	end
 end
 
-function addon:RefreshGUI()
+function addon:Refresh()
 	--[[
 	if not tablet:IsRegistered(guiname) then
 		self:RegisterGUI()
@@ -256,7 +276,5 @@ function addon:RefreshGUI()
 	--]]
 	if tablet:IsRegistered(NAME) then
 		tablet:Refresh(NAME)
-	else
-		self:Print(NAME .. ' is not a registered tablet')
 	end
 end
