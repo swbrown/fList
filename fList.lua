@@ -39,58 +39,6 @@ local options = {
 	    	func = 'OpenConfig',
 	    	guiHidden = true,
 	    },
-	    --[[
-	    action = {
-	    	order = 10,
-	    	type = 'group',
-	    	name = 'Actions',
-	    	desc = 'List Actions',
-	    	args = {
-	    		startlist = {
-			    	order = 10,
-			    	type = 'execute',
-			    	name = 'Start List',
-			    	desc = 'Starts a new list',
-			    	func = 'StartList',
-	    		},
-	    		closelist = {
-			    	order = 11,
-			    	type = 'execute',
-			    	name = 'Close List',
-			    	desc = 'Closes the current list',
-			    	func = 'CloseList',
-	    		},
-	    		printlist = {
-	    			order = 12,
-	    			type = 'execute',
-			    	name = 'Print List',
-			    	desc = 'Prints the current list',
-	    			func = 'PrintList',
-	    		},
-	    		inviteplayer = {
-	    			order = 13,
-			    	type = 'input',
-			    	name = 'Invite Player',
-			    	desc = 'Send an invite whisper to a player',
-			    	set = 'InvitePlayerHandler',
-	    		},
-	    		removeplayer = {
-	    			order = 14,
-			    	type = 'input',
-			    	name = 'Remove Player',
-			    	desc = 'Remove a player from the list',
-			    	set = 'UnlistPlayerHandler',
-	    		},
-	    		disbandraid = {
-	    			order = 15,
-	    			type = 'execute',
-			    	name = 'Disband Raid',
-			    	desc = 'Disbands the current raid',
-	    			func = 'DisbandRaid',
-	    		},
-	    	},
-	    },
-	    --]]
 		name = {
 			order = 20,
 			type = 'input',
@@ -350,6 +298,42 @@ Ctrl-Click to sort previous column.]]
 	}
 }
 
+local defaults = {
+	global = {
+		debug = false,
+		name = 'The Fabled',
+		prefix = {
+			list = 'list',
+			unlist = 'unlist',
+			invite = 'invite',
+			alt = 'alt',
+			note = 'note',
+			listrequest = 'listrequest',
+		},
+		timeout = {
+			invite = 5, --minutes
+			offline = 5, -- minutes
+		},
+		announcement = {
+			message = '',
+			officer = false,
+			guild = true,
+			raid = false,
+			channels = 'fabledapps',
+			interval = 5, --minutes
+		},
+		printlist = {
+			password = 'oreos',
+			channels = 'fabledleaders',
+			interval = 10, --minutes
+			officer = false,
+			guild = false,
+			raid = false,
+		},
+	},
+}
+
+
 --a filter handler to be called by the messsage event handler
 --return true causes the msg not to be displayed in the chat frame
 local function WhisperFilter(msg)
@@ -397,7 +381,7 @@ end
 --self.db contains the AceDB which gives you access to saved variables
 --self.Count keeps track of how much time has passed, each count is one TIMER_INTERVAL
 function addon:OnInitialize()
-	self.db = LibStub("AceDB-3.0"):New(DBNAME)
+	self.db = LibStub("AceDB-3.0"):New(DBNAME, defaults)
 	self:Debug(DBNAME .. " loaded")
 	
 	LibStub("AceConfig-3.0"):RegisterOptionsTable(NAME, options, {NAME})
