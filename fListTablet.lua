@@ -18,6 +18,8 @@ local tablet_data = {
 function addon:OnInitialize()
 	self:RegisterGUI()
 	self:Debug("<<OnInitialize>> end")
+	
+	--self.Timer = self:ScheduleRepeatingTimer(self["TimeUp"], TIMER_INTERVAL, self)
 end
 
 --Called by AceAddon when addon enabled
@@ -69,6 +71,8 @@ end
 
 --info - the clicked player info
 local function ClickPlayer(info)
+	fList:Debug("<<ClickPlayer>>")
+	fList:Debug(tostring(info))
 	if IsShiftKeyDown() then
 		fList:InvitePlayer(info.name)
 	elseif IsControlKeyDown() then
@@ -101,7 +105,7 @@ function addon:RegisterGUI()
 			'showTitleWhenDetached', true,
 			--'showHintWhenDetached', true,
 			'children', function()
-				print('in register children f unction')
+				--print('in register children f unction')
 				local cat
 				tablet:SetTitle('fList')
 				
@@ -223,12 +227,18 @@ function addon:RegisterGUI()
 					cat:AddLine('text', 'Print List', 'func', function() fList:PrintList() end)
 				end
 				cat:AddLine('text', 'Config', 'func', function() fList:OpenConfig() end)
-				--cat:AddLine('text', "Close", 'func', function() fListTablet:Hide() end)  -- WTF
-				--this close button doesnt' work
-				--when i reopent tablet its empty... don't know why.....
+				cat:AddLine(
+					'text', "Close",
+					'func', function()	LibStub('AceTimer-3.0'): ScheduleTimer( fListTablet['CloseHandler'], 0, fListTablet ) end --WTFWTFWTFOMGWTF
+					--i have no idea why the close needs to be done from a timer....
+				)
 			end
 		)
 	end
+end
+
+function addon:CloseHandler()
+	addon:Hide()
 end
 
 local isopen = false
