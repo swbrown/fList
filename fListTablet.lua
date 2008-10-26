@@ -1,4 +1,9 @@
 --http://old.wowace.com/wiki/Tablet-2.0
+--AceAddon-3.0
+--AceConsole-3.0
+--AceEvent-3.0
+--Tablet-2.0
+--Dewdrop-2.0
 
 fListTablet = LibStub("AceAddon-3.0"):NewAddon("fListTablet", "AceConsole-3.0", "AceEvent-3.0", "fLib")
 local addon = fListTablet
@@ -18,8 +23,6 @@ local tablet_data = {
 function addon:OnInitialize()
 	self:RegisterGUI()
 	self:Debug("<<OnInitialize>> end")
-	
-	--self.Timer = self:ScheduleRepeatingTimer(self["TimeUp"], TIMER_INTERVAL, self)
 end
 
 --Called by AceAddon when addon enabled
@@ -252,12 +255,6 @@ end
 
 
 function addon:Show()
-	--[[
-	if not tablet:IsRegistered(guiname) then
-		self:Register()
-	end
-	tablet:Open(guiname)
-	--]]
 	if tablet:IsRegistered(NAME) then
 		SortCurrentPlayers()
 		tablet:Open(NAME)
@@ -266,11 +263,6 @@ function addon:Show()
 end
 
 function addon:Hide()
-	--[[
-	if tablet:IsRegistered(guiname) then
-		tablet:Close(guiname)
-	end
-	--]]
 	if tablet:IsRegistered(NAME) then
 		tablet:Close(NAME)
 		isopen = false
@@ -278,12 +270,6 @@ function addon:Hide()
 end
 
 function addon:Refresh()
-	--[[
-	if not tablet:IsRegistered(guiname) then
-		self:RegisterGUI()
-	end
-	tablet:Refresh(guiname)
-	--]]
 	if tablet:IsRegistered(NAME) then
 		tablet:Refresh(NAME)
 	end
