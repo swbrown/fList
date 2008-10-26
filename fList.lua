@@ -944,15 +944,17 @@ function addon:InvitePlayer(name)
 					" to receive invite.  Your invite will expire in " .. 
 					self.db.global.timeout.invite .. " minutes."
 			
-			if info.online == 'yes' then
+			--TODO: for now going to whisper them whether or not they are online
+			--b/c of issues with people logging on but info.online not yet updated when trying to invite them
+			--if info.online == 'yes' then
 				--check if player online, then accept and whisper
 				self:Whisper(name, msg)
-			else
+			--else
 				--send whisper to alt
 				if info.alt ~= "" then
 					self:Whisper(info.alt, msg)
 				end
-			end
+			--end
 		else
 			self:Print("No list available.")
 		end
