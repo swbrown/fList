@@ -746,7 +746,7 @@ end
 --Closes the current list
 --self.db.global.count keeps track of how many lists have been run
 --self.db.global.oldlist is a list of old lists
-function addon:CloseList()
+function addon:CloseListHandler(callback)
 	if CURRENTLIST.IsListOpen() then
 		self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
 		
@@ -768,6 +768,10 @@ function addon:CloseList()
 	else
 		self:Print("No list to close")
 	end
+	callback()
+end
+function addon:CloseList()
+	self:ConfirmDialog('Are you sure you want to close the current list?', 'YESNO', addon.CloseListHandler, self)
 end
 
 --List a new player and notifies whispertarget on success or failure
