@@ -1,3 +1,12 @@
+--AceAddon-3.0
+--AceConsole-3.0
+--AceEvent-3.0
+--AceTimer-3.0
+--AceDB-3.0
+--AceConfig-3.0
+--AceConfigDialog-3.0
+
+
 fList = LibStub("AceAddon-3.0"):NewAddon("fList", "AceConsole-3.0", "AceEvent-3.0", "AceTimer-3.0", "fLib")
 local addon = fList
 local NAME = 'fList'
