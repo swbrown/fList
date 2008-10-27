@@ -15,7 +15,7 @@ local DBNAME = 'fListDB'
 local TIMER_INTERVAL = 10 --secs
 local GUILD_ROSTER_INTERVAL = 50 --secs
 
-local CURRENTLIST = {}
+local CURRENTLIST = {} --table to hold functions
 addon.CURRENTLIST = CURRENTLIST
 
 local options = {
@@ -340,7 +340,7 @@ local function WhisperFilter(msg)
 	msg = strlower(strtrim(msg))
 	if strfind(msg, "%[" .. NAME .. "%]") == 1 then
 		msg = gsub(msg, strlower('/w ' .. MYNAME), '')
-		if strfind(msg, strlower(UnitName('player'))) then
+		if strfind(msg, strlower(MYNAME)) then
 			--if it STILL contains my name, let the whisper through
 			return false
 		else
@@ -388,6 +388,7 @@ function addon:OnInitialize()
 	self.BlizOptionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions(NAME, NAME)
 	
 	self:RegisterEvent("GUILD_ROSTER_UPDATE")
+	self:RegisterEvent("CHAT_MSG_SYSTEM")
 	self:RegisterEvent("CHAT_MSG_WHISPER")
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", WhisperFilter)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", WhisperFilter)
@@ -428,6 +429,7 @@ end
 --Print list
 function addon:TimeUp()
 	self:Debug("<<TimeUp>>")
+        --self:Debug("100")
 	self.Count = self.Count + 1
 	if CURRENTLIST.IsListOpen() then
 		if GUILD_ROSTER_INTERVAL > 0 then
@@ -440,21 +442,26 @@ function addon:TimeUp()
 		
 		self:Debug("Cleaning up list...")
 		for idx,info in ipairs(CURRENTLIST.GetList()) do
+		--self:Debug("103")
 			if UnitInRaid(info.name) then
 				--unlist players in raid
 				self:UnlistPlayer(info.name)
 			else
 				--update info to match guild roster
 				local rosterdata = fList.db.global.guildroster[strlower(info.name)]
+				--self:Debug("104" .. GetGuild)
 				if rosterdata then
 					info.rank = rosterdata.rank
 					info.rankIndex = rosterdata.rankIndex
 					info.level = rosterdata.level
 					info.class = rosterdata.class
 					info.zone = rosterdata.zone
+					--self:Debug("105" .. rosterdata.rank .. " : " .. strlower(info.name))
 					if rosterdata.online then
+					--self:Debug("106")
 						info.online = 'yes'
 					else
+					--self:Debug("107")
 						info.online = 'no'
 					end
 					info.status = rosterdata.status
@@ -504,6 +511,10 @@ function addon:GUILD_ROSTER_UPDATE()
 		if not self.db.global.guildroster then
 			self.db.global.guildroster = {}
 		end
+		--==================================================================================
+		--==================================================================================
+		--the online value returned by GetGuildRosterInfo is either nil or 1
+		--so temporarily setting everybody's online to 1
 		self.db.global.guildroster[strlower(name)] = {
 			name = name,
 			rank = rank,
@@ -513,10 +524,59 @@ function addon:GUILD_ROSTER_UPDATE()
 			zone = zone,
 			note = note,
 			officernote = officernote,
-			online = online,
+			--online = online,
+			online = 1,
 			status = status,
 		}
 	end
+end
+
+function addon:CHAT_MSG_SYSTEM(arg1,arg2)
+    local NoPlayer = strfind(arg2,"No player named");
+
+    if NoPlayer then
+	local a = strfind(arg2,"'");
+	local b = strfind(arg2,"'",a+1);
+	if a == nil then
+	    --self:Debug("300: " .. arg1 .. "  --  " .. arg2 .. "  a = nil  -- b = nil");
+	else 
+	    if b == nil then
+	        --self:Debug("301: " .. arg1 .. "  --  " .. arg2 .. "  a = " .. a .. "  -- b = nil");
+	    else
+
+		local name = strsub(arg2,a+1,b-1)
+		local info = CURRENTLIST.GetPlayerInfo(name)
+	        self:Debug("302: " .. name .. "  --  " .. arg2 .. "  a = " .. a .. "  -- b = " .. b);
+		self:Debug("302.3: " .. strlen(info.alt));
+		if strlen(info.alt) == 0 then
+			self:Debug("302.5: offline no main, revoking invite");
+			info.invited = false;
+			info.online = 'no';
+			CURRENTLIST.SavePlayerInfo(info, false);
+		end
+	    end
+        end
+    end
+  
+    -- Instantly delist memebers as they join
+    local JoinedRaid  = strfind(arg2,"has joined the raid group");
+    if JoinedRaid and CURRENTLIST.IsListOpen() then
+      local name = strsub(arg2,1,JoinedRaid-2)
+      self:Debug("Addy303: " .. name);
+      self:UnlistPlayer(name);
+    end
+
+    -- or a party (first member edge case)
+    local JoinedParty = strfind(arg2,"joins the party");
+    if JoinedParty and CURRENTLIST.IsListOpen() then
+    local name = strsub(arg2,1,JoinedParty-2)
+      self:Debug("Addy304: " .. name);
+      self:UnlistPlayer(name);
+    end
+
+    
+
+
 end
 
 --CHAT_MSG_WHISPER handler
@@ -713,8 +773,8 @@ function CURRENTLIST.RemovePlayerInfo(name)
 		for idx,info in ipairs(fList.db.global.currentlist) do
 			if name ==  info.name then
 				tremove(fList.db.global.currentlist, idx)
-				if addon.GUI then
-					addon.GUI:Refresh()
+				if fList.GUI then
+					fList.GUI:Refresh()
 				end
 			end
 		end
@@ -769,11 +829,12 @@ end
 
 --List a new player and notifies whispertarget on success or failure
 function addon:ListPlayer(name, whispertarget)
+        self:Debug("500: List player: " .. name);
 	name = strlower(strtrim(name))
 	local capname = self:Capitalize(name)
 	whispertarget = strtrim(whispertarget)
 	
-	if name == strlower(UnitName('player')) then
+	if name == strlower(MYNAME) then
 		self:Print("Why are you trying to list yourself?? You're the one running this list!!")
 		return
 	end
