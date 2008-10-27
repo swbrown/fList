@@ -511,10 +511,6 @@ function addon:GUILD_ROSTER_UPDATE()
 		if not self.db.global.guildroster then
 			self.db.global.guildroster = {}
 		end
-		--==================================================================================
-		--==================================================================================
-		--the online value returned by GetGuildRosterInfo is either nil or 1
-		--so temporarily setting everybody's online to 1
 		self.db.global.guildroster[strlower(name)] = {
 			name = name,
 			rank = rank,
@@ -524,8 +520,7 @@ function addon:GUILD_ROSTER_UPDATE()
 			zone = zone,
 			note = note,
 			officernote = officernote,
-			--online = online,
-			online = 1,
+			online = online,
 			status = status,
 		}
 	end
@@ -574,9 +569,6 @@ function addon:CHAT_MSG_SYSTEM(arg1,arg2)
       self:UnlistPlayer(name);
     end
 
-    
-
-
 end
 
 --CHAT_MSG_WHISPER handler
@@ -592,6 +584,11 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 	
 	local cmd = words[1];
 	self:Debug("cmd=" .. cmd)
+	
+	--update the guildees online status if they whisper you
+	if self.db.global.guildroster[author] then
+		self.db.global.guildroster[author].online = 'yes'
+	end
 	
 	if cmd == self.db.global.prefix.list then
 		--LIST whisper
