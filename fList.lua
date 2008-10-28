@@ -330,6 +330,7 @@ local defaults = {
 			guild = false,
 			raid = false,
 		},
+		guildroster = {}
 	},
 }
 
