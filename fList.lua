@@ -11,6 +11,7 @@ fList = LibStub("AceAddon-3.0"):NewAddon("fList", "AceConsole-3.0", "AceEvent-3.
 local addon = fList
 local NAME = 'fList'
 local DBNAME = 'fListDB'
+local MYNAME = UnitName('player')
 
 local TIMER_INTERVAL = 10 --secs
 local GUILD_ROSTER_INTERVAL = 50 --secs
@@ -334,20 +335,15 @@ local defaults = {
 	},
 }
 
-
 --a filter handler to be called by the messsage event handler
 --return true causes the msg not to be displayed in the chat frame
+
+--CHAT_MSG_WHISPER
+--hide incoming messages
 local function WhisperFilter(msg)
 	msg = strlower(strtrim(msg))
-	if strfind(msg, "%[" .. NAME .. "%]") == 1 then
-		msg = gsub(msg, strlower('/w ' .. MYNAME), '')
-		if strfind(msg, strlower(MYNAME)) then
-			--if it STILL contains my name, let the whisper through
-			return false
-		else
-			return true
-		end
-	elseif strfind(msg, addon.db.global.prefix.list) == 1 then
+	addon:Debug('<<WhisperFilter>>msg='..msg)
+	if strfind(msg, addon.db.global.prefix.list) == 1 then
 		return true
 	elseif strfind(msg, addon.db.global.prefix.unlist) == 1 then
 		return true
@@ -359,23 +355,20 @@ local function WhisperFilter(msg)
 		return true
 	elseif strfind(msg, addon.db.global.prefix.listrequest) == 1 then
 		return true
-	--elseif strfind(msg, "%[MegaelliAR%]") == 1 then
-		--special temporary stuff to do
-		--local wds = addon:ParseWords(msg, 7)
-		--if wds then
-		--	local name = wds[5]
-		--	local dkpparts = {strsplit(".", strsub(wds[7], 1, #wds[7]-1))}
-		--	addon:Print(name .. " hashas " .. dkpparts[1] .. " dkp")
-		--	fDKP:AddPlayer(name)
-		--	fDKP:SetDKP(name, tonumber(dkpparts[1]))
-		--else
-		--	addon:Print("wds is nil")
-		--end
-		--return false
 	end
 	
 	--you could change the msg also by doing
 	--return false, gsub(msg, "lol", "")
+end
+
+--CHAT_MSG_WHISPER_INFORM
+--hide outgoing messages
+local function WhisperFilter2(msg)
+	msg = strlower(strtrim(msg))
+	addon:Debug('<<WhisperFilter2>>msg='..msg)
+	if strfind(msg, "%[" .. strlower(NAME) .. "%]") == 1 then
+		return true
+	end
 end
 
 --Required by AceAddon
@@ -392,7 +385,7 @@ function addon:OnInitialize()
 	self:RegisterEvent("CHAT_MSG_SYSTEM")
 	self:RegisterEvent("CHAT_MSG_WHISPER")
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", WhisperFilter)
-	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", WhisperFilter)
+	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", WhisperFilter2)
 	
 	if CURRENTLIST.IsListOpen() then
 		self:RegisterEvent("PARTY_MEMBERS_CHANGED")
@@ -528,31 +521,26 @@ function addon:GUILD_ROSTER_UPDATE()
 end
 
 function addon:CHAT_MSG_SYSTEM(arg1,arg2)
-    local NoPlayer = strfind(arg2,"No player named");
-
-    if NoPlayer then
-	local a = strfind(arg2,"'");
-	local b = strfind(arg2,"'",a+1);
-	if a == nil then
-	    --self:Debug("300: " .. arg1 .. "  --  " .. arg2 .. "  a = nil  -- b = nil");
-	else 
-	    if b == nil then
-	        --self:Debug("301: " .. arg1 .. "  --  " .. arg2 .. "  a = " .. a .. "  -- b = nil");
-	    else
-
-		local name = strsub(arg2,a+1,b-1)
-		local info = CURRENTLIST.GetPlayerInfo(name)
-	        self:Debug("302: " .. name .. "  --  " .. arg2 .. "  a = " .. a .. "  -- b = " .. b);
-		self:Debug("302.3: " .. strlen(info.alt));
-		if strlen(info.alt) == 0 then
-			self:Debug("302.5: offline no main, revoking invite");
-			info.invited = false;
-			info.online = 'no';
-			CURRENTLIST.SavePlayerInfo(info, false);
+	self:Debug('<<CHAT_MSG_SYSTEM>>arg1='..tostring(arg1)..',arg2='..tostring(arg2))
+	
+	if strfind(arg2, 'Noplayernamed') == 1 then
+		local a = strfind(arg2,"'");
+		local b = strfind(arg2,"'",a+1);
+		if a and b then
+			local name = strsub(arg2,a+1,b-1)
+			local info = CURRENTLIST.GetPlayerInfo(name)
+		      --  self:Debug("302: " .. name .. "  --  " .. arg2 .. "  a = " .. a .. "  -- b = " .. b);
+			--self:Debug("302.3: " .. strlen(info.alt));
+			if info then --need to check if info here, in case player was deleted
+				if strlen(info.alt) == 0 then
+					self:Debug("302.5: offline no main, revoking invite");
+					info.invited = false;
+					info.online = 'no';
+					CURRENTLIST.SavePlayerInfo(info, false);
+				end
+			end
 		end
-	    end
-        end
-    end
+	end
   
     -- Instantly delist memebers as they join
     local JoinedRaid  = strfind(arg2,"has joined the raid group");
