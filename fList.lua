@@ -523,14 +523,14 @@ end
 function addon:CHAT_MSG_SYSTEM(arg1,arg2)
 	self:Debug('<<CHAT_MSG_SYSTEM>>arg1='..tostring(arg1)..',arg2='..tostring(arg2))
 	
-	if strfind(arg2, 'Noplayernamed') == 1 then
+	if strfind(arg2, 'No player named') == 1 then
 		local a = strfind(arg2,"'");
 		local b = strfind(arg2,"'",a+1);
 		if a and b then
 			local name = strsub(arg2,a+1,b-1)
 			local info = CURRENTLIST.GetPlayerInfo(name)
-		      --  self:Debug("302: " .. name .. "  --  " .. arg2 .. "  a = " .. a .. "  -- b = " .. b);
-			--self:Debug("302.3: " .. strlen(info.alt));
+		        self:Debug("302: " .. name .. "  --  " .. arg2 .. "  a = " .. a .. "  -- b = " .. b);
+			self:Debug("302.3: " .. strlen(info.alt));
 			if info then --need to check if info here, in case player was deleted
 				if strlen(info.alt) == 0 then
 					self:Debug("302.5: offline no main, revoking invite");
