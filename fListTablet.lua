@@ -68,7 +68,7 @@ end
 
 local function SortCurrentPlayers()
 	if fList and fList.CURRENTLIST.IsListOpen() then
-		table.sort(fList.CURRENTLIST.GetList(), compare1) 
+		table.sort(fList.CURRENTLIST.GetPlayers(), compare1) 
 	end
 end
 
@@ -189,7 +189,7 @@ function addon:RegisterGUI()
 					if fList.CURRENTLIST.Count() == 0 then
 						cat:AddLine('text', 'List is empty')
 					end
-					for idx,info in ipairs(fList.CURRENTLIST.GetList()) do
+					for idx,info in ipairs(fList.CURRENTLIST.GetPlayers()) do
 						cat:AddLine(
 							'func', ClickPlayer,
 							'arg1', info,

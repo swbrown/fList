@@ -426,6 +426,22 @@ function addon:TimeUp()
         --self:Debug("100")
 	self.Count = self.Count + 1
 	if CURRENTLIST.IsListOpen() then
+		if self.db.global.announcement.interval > 0 then
+			self:Debug("Announcement...")
+			if self.Count - self.announcementcount > self.db.global.announcement.interval * 60 / TIMER_INTERVAL then
+				self:AnnounceList()
+				self.announcementcount = self.Count
+			end
+		end
+		
+		if self.db.global.printlist.interval > 0 then
+			self:Debug("Print List...")
+			if self.Count - self.printlistcount > self.db.global.printlist.interval * 60 / TIMER_INTERVAL then
+				self:AnnounceList()
+				self.printlistcount = self.Count
+			end
+		end
+		
 		if GUILD_ROSTER_INTERVAL > 0 then
 			self:Debug("Guild Roster...")
 			if self.Count - self.guildrostercount > GUILD_ROSTER_INTERVAL * 60 / TIMER_INTERVAL then
@@ -435,7 +451,7 @@ function addon:TimeUp()
 		end
 		
 		self:Debug("Cleaning up list...")
-		for idx,info in ipairs(CURRENTLIST.GetList()) do
+		for idx,info in ipairs(CURRENTLIST.GetPlayers()) do
 		--self:Debug("103")
 			if UnitInRaid(info.name) then
 				--unlist players in raid
@@ -472,29 +488,7 @@ function addon:TimeUp()
 				end
 			end
 		end
-		
-		if self.db.global.announcement.interval > 0 then
-			self:Debug("Announcement...")
-			if self.Count - self.announcementcount > self.db.global.announcement.interval * 60 / TIMER_INTERVAL then
-				self:AnnounceList()
-				self.announcementcount = self.Count
-			end
-		end
-		
-		if self.db.global.printlist.interval > 0 then
-			self:Debug("Print List...")
-			if self.Count - self.printlistcount > self.db.global.printlist.interval * 60 / TIMER_INTERVAL then
-				self:AnnounceList()
-				self.printlistcount = self.Count
-			end
-		end
 	end
-	
-	--tempidx = tempidx + 1
-	--if tempidx <= #tempnames then
-	--	self:Print("Whispering Megaelli raidpoints " .. tempnames[tempidx])
-	--	SendChatMessage("raidpoints " .. tempnames[tempidx], "WHISPER", nil, "Megaelli")
-	--end
 end
 
 --GUILD_ROSTER_UPDATE handler
@@ -529,9 +523,9 @@ function addon:CHAT_MSG_SYSTEM(arg1,arg2)
 		if a and b then
 			local name = strsub(arg2,a+1,b-1)
 			local info = CURRENTLIST.GetPlayerInfo(name)
-		        self:Debug("302: " .. name .. "  --  " .. arg2 .. "  a = " .. a .. "  -- b = " .. b);
-			self:Debug("302.3: " .. strlen(info.alt));
+		    self:Debug("302: " .. name .. "  --  " .. arg2 .. "  a = " .. a .. "  -- b = " .. b);
 			if info then --need to check if info here, in case player was deleted
+				self:Debug("302.3: " .. strlen(info.alt));
 				if strlen(info.alt) == 0 then
 					self:Debug("302.5: offline no main, revoking invite");
 					info.invited = false;
@@ -648,13 +642,19 @@ end
 
 function CURRENTLIST.Count()
 	if fList.db.global.currentlist then
-		return #fList.db.global.currentlist
+		--return #fList.db.global.currentlist
+		return #fList.db.global.currentlist.players
 	end
 	return 0
 end
 
 function CURRENTLIST.NewList()
-	fList.db.global.currentlist = {}
+	--fList.db.global.currentlist = {}
+	fList.db.global.currentlist = {
+		starttime = date("%m/%d/%y %H:%M:%S"),
+		players = {},
+		archive = {}
+	}
 	if addon.GUI then
 		addon.GUI:Refresh()
 	end
@@ -667,8 +667,12 @@ function CURRENTLIST.ClearList()
 	end
 end
 
-function CURRENTLIST.GetList()
-	return	fList.db.global.currentlist
+function CURRENTLIST.GetData()
+	return fList.db.global.currentlist
+end
+
+function CURRENTLIST.GetPlayers()
+	return	fList.db.global.currentlist.players
 end
 
 --Returns a player info table
@@ -688,6 +692,8 @@ function CURRENTLIST.CreatePlayerInfo(name)
 		zone = '',
 		online = 'yes',
 		status = '',
+		joinlisttime = '',
+		leavelisttime = '',
 	}
 	if fList.db.global.guildroster[name] then
 		local rosterdata = fList.db.global.guildroster[name]
@@ -715,18 +721,22 @@ function CURRENTLIST.SavePlayerInfo(newplayerinfo, isnewplayer)
 	end
 	if CURRENTLIST.IsListOpen() then
 		if isnewplayer then
-			for idx,info in ipairs(fList.db.global.currentlist) do
+			--for idx,info in ipairs(fList.db.global.currentlist) do
+			for idx,info in ipairs(fList.db.global.currentlist.players) do
 				fList:Debug(idx .. " comparing " .. info.name .. ' with ' .. newplayerinfo.name)
 				if info.name == newplayerinfo.name then
 					fList:Debug("MATCH " .. info.name .. ' with ' .. newplayerinfo.name)
-					fList.db.global.currentlist.idx = newplayerinfo
+					--fList.db.global.currentlist.idx = newplayerinfo
+					fList.db.global.currentlist.players[idx] = newplayerinfo
 					if addon.GUI then
 						addon.GUI:Refresh()
 					end
 					return true
 				end
 			end
-			fList.db.global.currentlist[#fList.db.global.currentlist + 1] = newplayerinfo
+			--fList.db.global.currentlist[#fList.db.global.currentlist + 1] = newplayerinfo
+			newplayerinfo.joinlisttime = date("%m/%d/%y %H:%M:%S")
+			tinsert(fList.db.global.currentlist.players, newplayerinfo)
 		end
 		if addon.GUI then
 			addon.GUI:Refresh()
@@ -743,7 +753,8 @@ function CURRENTLIST.GetPlayerInfo(name)
 	if CURRENTLIST.IsListOpen() then
 		name = strlower(strtrim(name))
 		name = fList:Capitalize(name)
-		for idx,info in ipairs(fList.db.global.currentlist) do
+		--for idx,info in ipairs(fList.db.global.currentlist) do
+		for idx,info in ipairs(fList.db.global.currentlist.players) do
 			if name ==  info.name then
 				return info
 			end
@@ -756,9 +767,13 @@ function CURRENTLIST.RemovePlayerInfo(name)
 	if CURRENTLIST.IsListOpen() then
 		name = strlower(strtrim(name))
 		name = fList:Capitalize(name)
-		for idx,info in ipairs(fList.db.global.currentlist) do
+		--for idx,info in ipairs(fList.db.global.currentlist) do
+		for idx,info in ipairs(fList.db.global.currentlist.players) do
 			if name ==  info.name then
-				tremove(fList.db.global.currentlist, idx)
+				--tremove(fList.db.global.currentlist, idx)
+				tremove(fList.db.global.currentlist.players, idx)
+				info.leavelisttime = date("%m/%d/%y %H:%M:%S")
+				tinsert(fList.db.global.currentlist.archive, info)
 				if fList.GUI then
 					fList.GUI:Refresh()
 				end
@@ -783,23 +798,26 @@ function addon:StartList()
 end
 
 --Closes the current list
---self.db.global.count keeps track of how many lists have been run
+--self.db.global.count keeps track of how many lists have been run  --don't need this...
 --self.db.global.oldlist is a list of old lists
 function addon:CloseListHandler(callback)
 	if CURRENTLIST.IsListOpen() then
 		self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
 		
-		if self.db.global.count == nil then
-			self.db.global.count = 0
-		end
+		--if self.db.global.count == nil then
+		--	self.db.global.count = 0
+		--end
 		if self.db.global.oldlist == nil then
 			self.db.global.oldlist = {}
 		end
 		
 		--save the list in self.db.global.oldlist
 		if CURRENTLIST.Count() > 0 then
-			self.db.global.count = self.db.global.count + 1
-			self.db.global.oldlist[self.db.global.count] = CURRENTLIST.GetList()
+			--self.db.global.count = self.db.global.count + 1
+			--self.db.global.oldlist[self.db.global.count] = CURRENTLIST.GetPlayers()
+			local data = CURRENTLIST.GetData()
+			data.endtime = date("%m/%d/%y %H:%M:%S")
+			tinsert(self.db.global.oldlist, data)
 		end
 		CURRENTLIST.ClearList()
 		self:Announce("Thank you for listing with " .. self.db.global.name .. ". The list is now closed.")
@@ -1030,7 +1048,7 @@ function addon:PrintList()
 	if CURRENTLIST.IsListOpen() then
 		--TODO: sort list
 		local listmsg = ''--"Current list: "
-		for idx, info in ipairs(CURRENTLIST.GetList()) do
+		for idx, info in ipairs(CURRENTLIST.GetPlayers()) do
 			listmsg = listmsg .. info.name .. " "
 		end
 		if listmsg == '' then
@@ -1049,10 +1067,10 @@ function addon:PrintList()
 end
 
 --Returns the players in the current list in an array
-function addon:GetList()
+function addon:GetPlayers()
 	local players = {}
 	if CURRENTLIST.IsListOpen() then
-		for idx, info in ipairs(CURRENTLIST.GetList()) do
+		for idx, info in ipairs(CURRENTLIST.GetPlayers()) do
 			players[#players+1] = info.name
 		end
 	end
