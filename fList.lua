@@ -331,7 +331,8 @@ local defaults = {
 			guild = false,
 			raid = false,
 		},
-		guildroster = {}
+		guildroster = {},
+        friendroster = {}
 	},
 }
 
@@ -402,6 +403,8 @@ function addon:OnInitialize()
 	self.Timer = self:ScheduleRepeatingTimer(self["TimeUp"], TIMER_INTERVAL, self)
 	
 	self:Debug("<<OnInitialize>> end")
+    self.db.global.guildroster = {};
+    GuildRoster();
 end
 
 --Called by AceAddon when addon enabled
@@ -422,12 +425,11 @@ end
 --Announce
 --Print list
 function addon:TimeUp()
-	self:Debug("<<TimeUp>>")
-        --self:Debug("100")
+	--self:Debug("<<TimeUp>>")
 	self.Count = self.Count + 1
 	if CURRENTLIST.IsListOpen() then
 		if self.db.global.announcement.interval > 0 then
-			self:Debug("Announcement...")
+			--self:Debug("Announcement...")
 			if self.Count - self.announcementcount > self.db.global.announcement.interval * 60 / TIMER_INTERVAL then
 				self:AnnounceList()
 				self.announcementcount = self.Count
@@ -435,7 +437,7 @@ function addon:TimeUp()
 		end
 		
 		if self.db.global.printlist.interval > 0 then
-			self:Debug("Print List...")
+			--self:Debug("Print List...")
 			if self.Count - self.printlistcount > self.db.global.printlist.interval * 60 / TIMER_INTERVAL then
 				self:AnnounceList()
 				self.printlistcount = self.Count
@@ -443,16 +445,15 @@ function addon:TimeUp()
 		end
 		
 		if GUILD_ROSTER_INTERVAL > 0 then
-			self:Debug("Guild Roster...")
+			--self:Debug("Guild Roster...")
 			if self.Count - self.guildrostercount > GUILD_ROSTER_INTERVAL * 60 / TIMER_INTERVAL then
 				GuildRoster()
 				self.guildrostercount = self.Count
 			end
 		end
 		
-		self:Debug("Cleaning up list...")
+		--self:Debug("Cleaning up list...")
 		for idx,info in ipairs(CURRENTLIST.GetPlayers()) do
-		--self:Debug("103")
 			if UnitInRaid(info.name) then
 				--unlist players in raid
 				self:UnlistPlayer(info.name)
@@ -468,15 +469,39 @@ function addon:TimeUp()
 					info.zone = rosterdata.zone
 					--self:Debug("105" .. rosterdata.rank .. " : " .. strlower(info.name))
 					if rosterdata.online then
-					--self:Debug("106")
+                      if rosterdata.online == 'yes' then					   
 						info.online = 'yes'
-					else
-					--self:Debug("107")
+					  else
 						info.online = 'no'
-					end
-					info.status = rosterdata.status
+					  end
+                    else
+                    
+                    end
+					info.status = rosterdata.status                                
 					CURRENTLIST.SavePlayerInfo(info,false)
-				end
+				else
+                  local froster = self.db.global.friendroster[strlower(info.name)];
+                  if froster then
+                    info.rank = "NON";
+                    info.rankIndex = 0;
+                    info.level = froster.level;
+                    info.class = froster.class;
+                    info.zone = froster.zone;
+                    if froster.online then
+                      if froster.online == 'yes' then
+                        info.online = 'yes';
+                      else
+                        info.online = 'no';
+                      end
+                    else 
+                      
+                    end
+                    info.status = froster.status                                
+					CURRENTLIST.SavePlayerInfo(info,false)
+                  else
+
+                  end
+                end
 				
 				--TODO: remove players from list if offline for too long
 				
@@ -495,7 +520,12 @@ end
 function addon:GUILD_ROSTER_UPDATE()
 	for i=1,GetNumGuildMembers(true) do
 		local name, rank, rankIndex, level, class, zone, note, 
-			officernote, online, status, something = GetGuildRosterInfo(i)
+			officernote, online, status, something = GetGuildRosterInfo(i)        
+        if online then
+            online = 'yes';            
+        else
+          online = 'no';
+        end
 		if not self.db.global.guildroster then
 			self.db.global.guildroster = {}
 		end
@@ -511,21 +541,48 @@ function addon:GUILD_ROSTER_UPDATE()
 			online = online,
 			status = status,
 		}
+	end   
+    for i=1,GetNumFriends(true) do
+		local name, level, class, zone, online, status, note = GetFriendInfo(i)        
+        if online then
+            online = 'yes';            
+        else
+            online = 'no';          
+        end
+		if not self.db.global.friendroster then            
+			self.db.global.friendroster = {}
+		end
+		self.db.global.friendroster[strlower(name)] = {
+			name = name,			
+			level = level,
+			class = class,
+			zone = zone,
+			online = online,
+			status = status,
+            note = note
+		}
 	end
 end
 
 function addon:CHAT_MSG_SYSTEM(arg1,arg2)
-	self:Debug('<<CHAT_MSG_SYSTEM>>arg1='..tostring(arg1)..',arg2='..tostring(arg2))
+	--self:Debug('<<CHAT_MSG_SYSTEM>>arg1='..tostring(arg1)..',arg2='..tostring(arg2))
 	
-	if strfind(arg2, 'No player named') == 1 then
+	local listOpen = CURRENTLIST.IsListOpen() ;
+	if listOpen and (strfind(arg2, 'No player named') == 1) then
 		local a = strfind(arg2,"'");
 		local b = strfind(arg2,"'",a+1);
 		if a and b then
 			local name = strsub(arg2,a+1,b-1)
-			local info = CURRENTLIST.GetPlayerInfo(name)
-		    self:Debug("302: " .. name .. "  --  " .. arg2 .. "  a = " .. a .. "  -- b = " .. b);
+			local info = CURRENTLIST.GetPlayerInfo(name)		    
 			if info then --need to check if info here, in case player was deleted
-				self:Debug("302.3: " .. strlen(info.alt));
+
+                if self.db.global.guildroster[strlower(name)] then                  
+                  self.db.global.guildroster[strlower(name)].online = 'no';                  
+                else
+                  AddFriend(name);
+                  self.db.global.friendroster[strlower(name)].online = 'no';
+                end
+                
 				if strlen(info.alt) == 0 then
 					self:Debug("302.5: offline no main, revoking invite");
 					info.invited = false;
@@ -537,21 +594,63 @@ function addon:CHAT_MSG_SYSTEM(arg1,arg2)
 	end
   
     -- Instantly delist memebers as they join
-    local JoinedRaid  = strfind(arg2,"has joined the raid group");
-    if JoinedRaid and CURRENTLIST.IsListOpen() then
-      local name = strsub(arg2,1,JoinedRaid-2)
-      self:Debug("Addy303: " .. name);
-      self:UnlistPlayer(name);
+    if listOpen then
+        local JoinedRaid  = strfind(arg2,"has joined the raid group");
+        local JoinedParty = strfind(arg2,"joins the party");
+        if (JoinedRaid or JoinedParty) then
+            local JoinedPlace;
+            if JoinedRaid then
+                JoinedPlace = JoinedRaid;
+            else
+                JoinedPlace = JoinedParty;
+            end
+            local name = strsub(arg2,1,JoinedPlace-2)
+            local info = CURRENTLIST.GetPlayerInfo(name); 
+            if info then -- are they on the list?
+                self:UnlistPlayer(name);
+            end
+        end
     end
 
-    -- or a party (first member edge case)
-    local JoinedParty = strfind(arg2,"joins the party");
-    if JoinedParty and CURRENTLIST.IsListOpen() then
-    local name = strsub(arg2,1,JoinedParty-2)
-      self:Debug("Addy304: " .. name);
-      self:UnlistPlayer(name);
-    end
+      
+    if listOpen then
+        local ComeOnline  = strfind(arg2,"has come online");         
+        if ComeOnline then           
+            local name = strsub(arg2,10,9+(ComeOnline-17)/2);  -- This extracts the player name out of the text links, don't modify it please
+            local info = CURRENTLIST.GetPlayerInfo(name);
+            if info then
+                local rosterinfo = fList.db.global.guildroster[strlower(info.name)];
+                if rosterinfo then
+                    rosterinfo.online = 'yes';
+                else
+                    local froster = fList.db.global.friendroster[strlower(info.name)];
+                    froster.online = 'yes';
+                end
+                info.online = 'yes';                
+                CURRENTLIST.SavePlayerInfo(info,false);
+            end
 
+        end      
+        local WentOffline  = strfind(arg2,"has gone offline"); 
+        if WentOffline then
+            local name = strsub(arg2,1,WentOffline-2);
+            local info = CURRENTLIST.GetPlayerInfo(name);
+            if info then
+                local rosterinfo = fList.db.global.guildroster[strlower(info.name)];
+                if rosterinfo then
+                    rosterinfo.online = 'no';
+                else
+                    local froster = fList.db.global.friendroster[strlower(info.name)];
+                    froster.online = 'no';                    
+                end
+                info.online = 'no';
+                info.invited = false;
+                CURRENTLIST.SavePlayerInfo(info,false);
+            end
+
+        end      
+    end
+ 
 end
 
 --CHAT_MSG_WHISPER handler
@@ -571,6 +670,13 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 	--update the guildees online status if they whisper you
 	if self.db.global.guildroster[author] then
 		self.db.global.guildroster[author].online = 'yes'
+    else
+        if self.db.global.friendroster[author] then
+          self.db.global.friendroster[author].online = 'yes'
+        else
+          self.db.global.friendroster[author] = {};
+          self.db.global.friendroster[author].online = 'yes'
+        end
 	end
 	
 	if cmd == self.db.global.prefix.list then
@@ -579,17 +685,28 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 		--"list name" main = name, alt = author (for listing from an alt)
 		local main = author
 		local alt = ""
-		
 		if words[2] then
 			self:Debug("words[2]=" .. words[2])
 			main = words[2]
 			alt = author
 		end
 		
-		self:ListPlayer(main, author)
-		if #alt > 0 then
-			self:AltPlayer(main, alt, author)
-		end
+        local lowerMain = strlower(main);
+        local dontList  = 0;
+        if self.db.global.altlist then
+          if self.db.global.altlist[lowerMain] then
+              local msg = fList:Capitalize(main) .. " is already listed as the alt of " .. fList:Capitalize(self.db.global.altlist[lowerMain]) .. ", not listing.";
+              self:Whisper(author, msg);
+              dontList = 1;
+          end
+        end 
+        if dontList == 0 then
+          local gotListed = self:ListPlayer(main, author);
+  		  if (#alt > 0) and (gotListed ~= 0) then
+  	        self:AltPlayer(main, alt, author)
+		  end         
+        end
+        
 	elseif cmd == self.db.global.prefix.unlist then
 		--UNLIST whisper
 		--"unlist" main = author
@@ -623,7 +740,8 @@ end
 function addon:PARTY_MEMBERS_CHANGED()
 	self:Debug("<<PARTY_MEMBERS_CHANGED>>" .. tostring(GetNumPartyMembers()) .. " members in the raid")
 	if GetNumPartyMembers() > 0 then
-		ConvertToRaid()
+		ConvertToRaid();
+        addon.GUI:Refresh();
 	end
 end
 
@@ -703,19 +821,38 @@ function CURRENTLIST.CreatePlayerInfo(name)
 		newplayer.class = rosterdata.class
 		newplayer.zone = rosterdata.zone
 		if rosterdata.online then
-			newplayer.online = 'yes'
-		else
+         if rosterdata.online == 'yes' then
+		    newplayer.online = 'yes'
+		 else
 			newplayer.online = 'no'
+         end
 		end
-		newplayer.status = rosterdata.status
-	end
+		newplayer.status = rosterdata.status	
+    else
+        AddFriend(name);
+        GuildRoster();
+        local frosterdata = fList.db.global.friendroster[name]		
+        if frosterdata then
+			newplayer.level = frosterdata.level
+			newplayer.class = frosterdata.class
+			newplayer.zone = frosterdata.zone
+			if frosterdata.online then
+             if frosterdata.online == 'yes' then
+			    newplayer.online = 'yes'
+			 else
+				newplayer.online = 'no'
+             end
+			end
+			newplayer.status = frosterdata.status
+        end
+    end
 	return newplayer
 end
 
 --Returns true if successful
 --else false
 function CURRENTLIST.SavePlayerInfo(newplayerinfo, isnewplayer)
-	fList:Debug("<<SavePlayerInfo>>")
+	--fList:Debug("<<SavePlayerInfo>>")
 	if isnewplayer == nil then
 		isnewplayer = true
 	end
@@ -754,7 +891,7 @@ function CURRENTLIST.GetPlayerInfo(name)
 		name = strlower(strtrim(name))
 		name = fList:Capitalize(name)
 		--for idx,info in ipairs(fList.db.global.currentlist) do
-		for idx,info in ipairs(fList.db.global.currentlist.players) do
+		for idx,info in ipairs(fList.db.global.currentlist.players) do         
 			if name ==  info.name then
 				return info
 			end
@@ -781,6 +918,19 @@ function CURRENTLIST.RemovePlayerInfo(name)
 		end
 	end
 end
+
+function CURRENTLIST.RemovePlayerAlt(name)
+	if CURRENTLIST.IsListOpen() then
+        name = strlower(strtrim(name));	
+        fList:Debug("Addy4444: " .. name);	
+		for idx,info in pairs(fList.db.global.altlist) do
+            fList:Debug("Addy4445: name = " .. name .. "  -- info = " .. info .. "  -- idx = " .. idx);	
+			if name ==  idx then
+				fList.db.global.altlist[idx] = nil;			
+			end
+		end
+	end
+end
 --==============================================================================================
 --==============================================================================================
 
@@ -802,6 +952,7 @@ end
 --self.db.global.oldlist is a list of old lists
 function addon:CloseListHandler(callback)
 	if CURRENTLIST.IsListOpen() then
+        self.db.global.altlist = {};
 		self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
 		
 		--if self.db.global.count == nil then
@@ -834,19 +985,20 @@ end
 --List a new player and notifies whispertarget on success or failure
 function addon:ListPlayer(name, whispertarget)
         self:Debug("500: List player: " .. name);
+    local gotListed = 0;
 	name = strlower(strtrim(name))
 	local capname = self:Capitalize(name)
 	whispertarget = strtrim(whispertarget)
 	
 	if name == strlower(MYNAME) then
-		self:Print("Why are you trying to list yourself?? You're the one running this list!!")
-		return
+		self:Print("Why are you trying to list yourself?? You're the one running this list!!")		
 	end
 	
 	local msg = ""
+    local inRaid = UnitInRaid(name);
 	if not CURRENTLIST.IsListOpen() then
 		msg = "No list available"
-	elseif UnitInRaid(name) then
+	elseif inRaid then
 		msg = capname .. " is already in the raid"
 	else
 		local info = CURRENTLIST.GetPlayerInfo(name)
@@ -855,16 +1007,19 @@ function addon:ListPlayer(name, whispertarget)
 		else
 			local newplayerinfo = CURRENTLIST.CreatePlayerInfo(name)
 			CURRENTLIST.SavePlayerInfo(newplayerinfo)
+            gotListed = 1;
 			msg = capname .. " has been added to the list"
 		end
 	end
 	
+
 	if whispertarget then
 		self:Whisper(whispertarget, msg)
 	else
 		self:Whisper(name, msg)
 	end
 	self:Print(msg)
+    return gotListed;
 end
 
 --Set handler for AceConfig
@@ -881,9 +1036,23 @@ function addon:UnlistPlayer(name, whispertarget)
 	
 	if not CURRENTLIST.IsListOpen() then
 		msg = "No list available"
-	else
-		CURRENTLIST.RemovePlayerInfo(name)
-		msg = capname .. " has been removed from the list"
+	else		
+        local info = CURRENTLIST.GetPlayerInfo(name);
+        self:Debug("Addy404: " .. name);
+        if info then
+          self:Debug("Addy405: " .. name);
+          if info.alt ~= "" then
+            self:Debug("Addy406: " .. name);
+            if self.db.global.altlist then
+              if self.db.global.altlist[info.alt] then
+                self:Debug("Addy407: " .. name .. "  --  " .. info.alt);
+                CURRENTLIST.RemovePlayerAlt(info.alt)
+              end
+            end
+          end
+		  msg = capname .. " has been removed from the list"
+        end
+        CURRENTLIST.RemovePlayerInfo(name)
 	end
 	
 	if whispertarget then
@@ -911,8 +1080,13 @@ function addon:AltPlayer(name, alt, whispertarget)
 		end
 		
 		info.alt = alt
+        if self.db.global.altlist then
+        else 
+          self.db.global.altlist = {};
+        end
+        self.db.global.altlist[alt] = name;
 		CURRENTLIST.SavePlayerInfo(info, false)
-		self:Whisper(whispertarget, capname .. "'s alt has been sent to " .. capalt)
+		self:Whisper(whispertarget, capname .. "'s alt has been set to " .. capalt)
 	else
 		self:Whisper(whispertarget, "No list available")
 	end
@@ -1009,17 +1183,13 @@ function addon:InvitePlayer(name)
 					" to receive invite.  Your invite will expire in " .. 
 					self.db.global.timeout.invite .. " minutes."
 			
-			--TODO: for now going to whisper them whether or not they are online
-			--b/c of issues with people logging on but info.online not yet updated when trying to invite them
-			--if info.online == 'yes' then
-				--check if player online, then accept and whisper
-				self:Whisper(name, msg)
-			--else
-				--send whisper to alt
-				if info.alt ~= "" then
-					self:Whisper(info.alt, msg)
-				end
-			--end
+			--We now always whisper both the alt and the main, and track if either both or neither gets it...			
+			self:Whisper(name, msg)
+            info.mainInvited = true;
+			if info.alt ~= "" then
+    			self:Whisper(info.alt, msg)
+                info.altInvited = true;
+			end
 		else
 			self:Print("No list available.")
 		end
