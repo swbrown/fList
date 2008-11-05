@@ -1,4 +1,4 @@
-## Interface: 30200
+## Interface: 30000
 ## Title: fList
 ## Description: Tamrah's list addon
 ## SavedVariables: fListDB
