@@ -439,7 +439,7 @@ function addon:TimeUp()
 		if self.db.global.printlist.interval > 0 then
 			--self:Debug("Print List...")
 			if self.Count - self.printlistcount > self.db.global.printlist.interval * 60 / TIMER_INTERVAL then
-				self:AnnounceList()
+				--self:AnnounceList()
 				self.printlistcount = self.Count
 			end
 		end
@@ -875,8 +875,8 @@ function CURRENTLIST.SavePlayerInfo(newplayerinfo, isnewplayer)
 			newplayerinfo.joinlisttime = date("%m/%d/%y %H:%M:%S")
 			tinsert(fList.db.global.currentlist.players, newplayerinfo)
 		end
-		if addon.GUI then
-			addon.GUI:Refresh()
+		if fList.GUI then
+			fList.GUI:Refresh()
 		end
 		return true
 	end
