@@ -341,7 +341,7 @@ local defaults = {
 
 --CHAT_MSG_WHISPER
 --hide incoming messages
-local function WhisperFilter(msg)
+local function WhisperFilter(self, event, msg)
 	msg = strlower(strtrim(msg))
 	addon:Debug('<<WhisperFilter>>msg='..msg)
 	if strfind(msg, addon.db.global.prefix.list) == 1 then
@@ -364,7 +364,7 @@ end
 
 --CHAT_MSG_WHISPER_INFORM
 --hide outgoing messages
-local function WhisperFilter2(msg)
+local function WhisperFilter2(self, event, msg)
 	msg = strlower(strtrim(msg))
 	addon:Debug('<<WhisperFilter2>>msg='..msg)
 	if strfind(msg, "%[" .. strlower(NAME) .. "%]") == 1 then
@@ -529,18 +529,20 @@ function addon:GUILD_ROSTER_UPDATE()
 		if not self.db.global.guildroster then
 			self.db.global.guildroster = {}
 		end
-		self.db.global.guildroster[strlower(name)] = {
-			name = name,
-			rank = rank,
-			rankIndex = rankIndex,
-			level = level,
-			class = class,
-			zone = zone,
-			note = note,
-			officernote = officernote,
-			online = online,
-			status = status,
-		}
+		if name then
+			self.db.global.guildroster[strlower(name)] = {
+				name = name,
+				rank = rank,
+				rankIndex = rankIndex,
+				level = level,
+				class = class,
+				zone = zone,
+				note = note,
+				officernote = officernote,
+				online = online,
+				status = status,
+			}
+		end
 	end   
     for i=1,GetNumFriends(true) do
 		local name, level, class, zone, online, status, note = GetFriendInfo(i)        
