@@ -554,15 +554,17 @@ function addon:GUILD_ROSTER_UPDATE()
 		if not self.db.global.friendroster then            
 			self.db.global.friendroster = {}
 		end
-		self.db.global.friendroster[strlower(name)] = {
-			name = name,			
-			level = level,
-			class = class,
-			zone = zone,
-			online = online,
-			status = status,
-            note = note
-		}
+		if name then
+			self.db.global.friendroster[strlower(name)] = {
+				name = name,			
+				level = level,
+				class = class,
+				zone = zone,
+				online = online,
+				status = status,
+	            note = note
+			}
+		end
 	end
 end
 
