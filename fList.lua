@@ -744,8 +744,13 @@ end
 function addon:PARTY_MEMBERS_CHANGED()
 	self:Debug("<<PARTY_MEMBERS_CHANGED>>" .. tostring(GetNumPartyMembers()) .. " members in the raid")
 	if GetNumPartyMembers() > 0 then
-		ConvertToRaid();
-        addon.GUI:Refresh();
+		self:Debug('more than 0 party members')
+		if not UnitInRaid('player') then
+			self:Debug('not in raid')
+			self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
+			ConvertToRaid();
+        	addon.GUI:Refresh();
+        end
 	end
 end
 
