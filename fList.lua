@@ -1056,7 +1056,7 @@ function addon:UnlistPlayer(name, whispertarget)
             if self.db.global.altlist then
               if self.db.global.altlist[info.alt] then
                 self:Debug("Addy407: " .. name .. "  --  " .. info.alt);
-                CURRENTLIST.RemovePlayerAlt(info.alt)
+                --CURRENTLIST.RemovePlayerAlt(info.alt)
               end
             end
           end
