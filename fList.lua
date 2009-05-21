@@ -588,10 +588,10 @@ function addon:CHAT_MSG_SYSTEM(arg1,arg2)
                 end
                 
 				if strlen(info.alt) == 0 then
-					self:Debug("302.5: offline no main, revoking invite");
-					info.invited = false;
-					info.online = 'no';
-					CURRENTLIST.SavePlayerInfo(info, false);
+					self:Debug("--302.5: offline no main, revoking invite");
+					--info.invited = false;
+					--info.online = 'no';
+					--CURRENTLIST.SavePlayerInfo(info, false);
 				end
 			end
 		end
@@ -619,7 +619,8 @@ function addon:CHAT_MSG_SYSTEM(arg1,arg2)
       
     if listOpen then
         local ComeOnline  = strfind(arg2,"has come online");         
-        if ComeOnline then           
+        --if ComeOnline then           
+	if 0 then           
             local name = strsub(arg2,10,9+(ComeOnline-17)/2);  -- This extracts the player name out of the text links, don't modify it please
             local info = CURRENTLIST.GetPlayerInfo(name);
             if info then
@@ -635,8 +636,9 @@ function addon:CHAT_MSG_SYSTEM(arg1,arg2)
             end
 
         end      
-        local WentOffline  = strfind(arg2,"has gone offline"); 
-        if WentOffline then
+        --local WentOffline  = strfind(arg2,"has gone offline"); 
+        --if WentOffline then
+        if 0 then
             local name = strsub(arg2,1,WentOffline-2);
             local info = CURRENTLIST.GetPlayerInfo(name);
             if info then
@@ -647,9 +649,10 @@ function addon:CHAT_MSG_SYSTEM(arg1,arg2)
                     local froster = fList.db.global.friendroster[strlower(info.name)];
                     froster.online = 'no';                    
                 end
-                info.online = 'no';
-                info.invited = false;
-                CURRENTLIST.SavePlayerInfo(info,false);
+                --info.online = 'no';
+		--self:Debug("--302.6: offline no main, revoking invite");
+                --info.invited = false;
+                --CURRENTLIST.SavePlayerInfo(info,false);
             end
 
         end      
@@ -930,10 +933,8 @@ end
 
 function CURRENTLIST.RemovePlayerAlt(name)
 	if CURRENTLIST.IsListOpen() then
-        name = strlower(strtrim(name));	
-        fList:Debug("Addy4444: " .. name);	
+		name = strlower(strtrim(name));	
 		for idx,info in pairs(fList.db.global.altlist) do
-            fList:Debug("Addy4445: name = " .. name .. "  -- info = " .. info .. "  -- idx = " .. idx);	
 			if name ==  idx then
 				fList.db.global.altlist[idx] = nil;			
 			end
@@ -1047,12 +1048,9 @@ function addon:UnlistPlayer(name, whispertarget)
 	if not CURRENTLIST.IsListOpen() then
 		msg = "No list available"
 	else		
-        local info = CURRENTLIST.GetPlayerInfo(name);
-        self:Debug("Addy404: " .. name);
+        local info = CURRENTLIST.GetPlayerInfo(name);        
         if info then
-          self:Debug("Addy405: " .. name);
           if info.alt ~= "" then
-            self:Debug("Addy406: " .. name);
             if self.db.global.altlist then
               if self.db.global.altlist[info.alt] then
                 self:Debug("Addy407: " .. name .. "  --  " .. info.alt);
@@ -1139,6 +1137,7 @@ function addon:AcceptInvite(name)
 		if info.invited then
 			InviteUnit(name)
 		else
+			self:debug("Addy11111")
 			self:Whisper(name, capname .. " does not have an open invite")
 		end
 	else
@@ -1157,6 +1156,7 @@ function addon:ExpireInvite(name)
 			return
 		end
 		
+		self:Debug("Addy7878: ");
 		info.invited = false
 		CURRENTLIST.SavePlayerInfo(info, false)
 		self:Whisper(name, capname .. "'s invite has expired")
@@ -1185,6 +1185,7 @@ function addon:InvitePlayer(name)
 				return
 			end
 			
+			self:Debug("Attempting to invite2 " .. name)
 			info.invited = true
 			info.invitedcount = self.Count
 			CURRENTLIST.SavePlayerInfo(info, false)
