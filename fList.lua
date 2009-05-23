@@ -385,6 +385,7 @@ function addon:OnInitialize()
 	self:RegisterEvent("GUILD_ROSTER_UPDATE")
 	self:RegisterEvent("CHAT_MSG_SYSTEM")
 	self:RegisterEvent("CHAT_MSG_WHISPER")
+	
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", WhisperFilter)
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", WhisperFilter2)
 	
@@ -517,7 +518,10 @@ function addon:TimeUp()
 end
 
 --GUILD_ROSTER_UPDATE handler
-function addon:GUILD_ROSTER_UPDATE()
+function addon:GUILD_ROSTER_UPDATE(...)
+	addon:Print('<<GUILD_ROSTER_UPDATE')
+	addon:Print(...)
+
 	for i=1,GetNumGuildMembers(true) do
 		local name, rank, rankIndex, level, class, zone, note, 
 			officernote, online, status, something = GetGuildRosterInfo(i)        
@@ -1230,7 +1234,11 @@ function addon:PrintList()
 		--TODO: sort list
 		local listmsg = ''--"Current list: "
 		for idx, info in ipairs(CURRENTLIST.GetPlayers()) do
-			listmsg = listmsg .. info.name .. " "
+			listmsg = listmsg .. info.name
+			if info.invited then
+				listmsg = listmsg .. '(inv)'
+			end
+			listmsg = listmsg .. " "
 		end
 		if listmsg == '' then
 			listmsg = 'empty...'
