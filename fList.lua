@@ -587,12 +587,12 @@ function addon:CHAT_MSG_SYSTEM(arg1,arg2)
                   self.db.global.friendroster[strlower(name)].online = 'no';
                 end
                 
-				if strlen(info.alt) == 0 then
-					self:Debug("302.5: offline no main, revoking invite");
-					info.invited = false;
-					info.online = 'no';
-					CURRENTLIST.SavePlayerInfo(info, false);
-				end
+				--if strlen(info.alt) == 0 then
+				--	self:Debug("--302.5: offline no main, revoking invite");
+				--	info.invited = false;
+				--	info.online = 'no';
+				--	CURRENTLIST.SavePlayerInfo(info, false);
+				--end
 			end
 		end
 	end
@@ -616,44 +616,48 @@ function addon:CHAT_MSG_SYSTEM(arg1,arg2)
         end
     end
 
-      
-    if listOpen then
-        local ComeOnline  = strfind(arg2,"has come online");         
-        if ComeOnline then           
-            local name = strsub(arg2,10,9+(ComeOnline-17)/2);  -- This extracts the player name out of the text links, don't modify it please
-            local info = CURRENTLIST.GetPlayerInfo(name);
-            if info then
-                local rosterinfo = fList.db.global.guildroster[strlower(info.name)];
-                if rosterinfo then
-                    rosterinfo.online = 'yes';
-                else
-                    local froster = fList.db.global.friendroster[strlower(info.name)];
-                    froster.online = 'yes';
-                end
-                info.online = 'yes';                
-                CURRENTLIST.SavePlayerInfo(info,false);
-            end
-
-        end      
-        local WentOffline  = strfind(arg2,"has gone offline"); 
-        if WentOffline then
-            local name = strsub(arg2,1,WentOffline-2);
-            local info = CURRENTLIST.GetPlayerInfo(name);
-            if info then
-                local rosterinfo = fList.db.global.guildroster[strlower(info.name)];
-                if rosterinfo then
-                    rosterinfo.online = 'no';
-                else
-                    local froster = fList.db.global.friendroster[strlower(info.name)];
-                    froster.online = 'no';                    
-                end
-                info.online = 'no';
-                info.invited = false;
-                CURRENTLIST.SavePlayerInfo(info,false);
-            end
-
-        end      
-    end
+     
+--    Agronqui's online tracking stuff, save for me for a bit commented out, or I'll lose it all :)
+--    if listOpen then
+--        local ComeOnline  = strfind(arg2,"has come online");         
+--        --if ComeOnline then           
+--	if nil then           
+--            local name = strsub(arg2,10,9+(ComeOnline-17)/2);  -- This extracts the player name out of the text links, don't modify it please
+--            local info = CURRENTLIST.GetPlayerInfo(name);
+--            if info then
+--                local rosterinfo = fList.db.global.guildroster[strlower(info.name)];
+--                if rosterinfo then
+--                    rosterinfo.online = 'yes';
+--                else
+--                    local froster = fList.db.global.friendroster[strlower(info.name)];
+--                    froster.online = 'yes';
+--                end
+--                info.online = 'yes';                
+--                CURRENTLIST.SavePlayerInfo(info,false);
+--            end
+--
+--        end      
+--        --local WentOffline  = strfind(arg2,"has gone offline"); 
+--        --if WentOffline then
+--        if nil then
+--            local name = strsub(arg2,1,WentOffline-2);
+--            local info = CURRENTLIST.GetPlayerInfo(name);
+--            if info then
+--                local rosterinfo = fList.db.global.guildroster[strlower(info.name)];
+--                if rosterinfo then
+--                    rosterinfo.online = 'no';
+--                else
+--                    local froster = fList.db.global.friendroster[strlower(info.name)];
+--                    froster.online = 'no';                    
+--                end
+--                --info.online = 'no';
+--		--self:Debug("--302.6: offline no main, revoking invite");
+--                --info.invited = false;
+--                --CURRENTLIST.SavePlayerInfo(info,false);
+--            end
+--
+--        end      
+--    end
  
 end
 
@@ -930,10 +934,8 @@ end
 
 function CURRENTLIST.RemovePlayerAlt(name)
 	if CURRENTLIST.IsListOpen() then
-        name = strlower(strtrim(name));	
-        fList:Debug("Addy4444: " .. name);	
+		name = strlower(strtrim(name));	
 		for idx,info in pairs(fList.db.global.altlist) do
-            fList:Debug("Addy4445: name = " .. name .. "  -- info = " .. info .. "  -- idx = " .. idx);	
 			if name ==  idx then
 				fList.db.global.altlist[idx] = nil;			
 			end
@@ -1005,7 +1007,7 @@ function addon:ListPlayer(name, whispertarget)
 	end
 	
 	local msg = ""
-    local inRaid = UnitInRaid(name);
+	local inRaid = UnitInRaid(name);
 	if not CURRENTLIST.IsListOpen() then
 		msg = "No list available"
 	elseif inRaid then
@@ -1013,7 +1015,11 @@ function addon:ListPlayer(name, whispertarget)
 	else
 		local info = CURRENTLIST.GetPlayerInfo(name)
 		if info then
-			msg = capname .. " is already on the list"
+			if info.invited then
+				msg = capname .. " is already invited to the raid"
+			else
+				msg = capname .. " is already on the list"
+			end
 		else
 			local newplayerinfo = CURRENTLIST.CreatePlayerInfo(name)
 			CURRENTLIST.SavePlayerInfo(newplayerinfo)
@@ -1047,22 +1053,18 @@ function addon:UnlistPlayer(name, whispertarget)
 	if not CURRENTLIST.IsListOpen() then
 		msg = "No list available"
 	else		
-        local info = CURRENTLIST.GetPlayerInfo(name);
-        self:Debug("Addy404: " .. name);
-        if info then
-          self:Debug("Addy405: " .. name);
-          if info.alt ~= "" then
-            self:Debug("Addy406: " .. name);
-            if self.db.global.altlist then
-              if self.db.global.altlist[info.alt] then
-                self:Debug("Addy407: " .. name .. "  --  " .. info.alt);
-                CURRENTLIST.RemovePlayerAlt(info.alt)
-              end
-            end
+          local info = CURRENTLIST.GetPlayerInfo(name);        
+          if info then
+--            if info.alt ~= "" then
+--              if self.db.global.altlist then
+--               if self.db.global.altlist[info.alt] then
+--   		--CURRENTLIST.RemovePlayerAlt(info.alt)
+--                end
+--              end
+--            end
+	    msg = capname .. " has been removed from the list"
           end
-		  msg = capname .. " has been removed from the list"
-        end
-        CURRENTLIST.RemovePlayerInfo(name)
+          CURRENTLIST.RemovePlayerInfo(name)
 	end
 	
 	if whispertarget then
@@ -1173,7 +1175,6 @@ end
 
 --Notify a player that they have been invited
 function addon:InvitePlayer(name)
-	self:Debug("Attempting to invite " .. name)
 	if name then
 		if CURRENTLIST.IsListOpen() then
 			name = strlower(strtrim(name))
