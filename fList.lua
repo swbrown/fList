@@ -19,6 +19,15 @@ local GUILD_ROSTER_INTERVAL = 50 --secs
 local CURRENTLIST = {} --table to hold functions
 addon.CURRENTLIST = CURRENTLIST
 
+local helptxtt = {
+	txt = ' /w ' .. MYNAME .. ' help for more info',
+	help = 'Usage: /w ' .. MYNAME .. ' cmd [args] - Commands: list, unlist, alt, note - /w ' .. MYNAME .. ' help cmd for more info',
+	list = 'Usage1: /w ' .. MYNAME .. ' list - This adds yourself to the list. Usage2: /w ' ..MYNAME .. " list name - name = main character's name - This should be used from an alt to list your main char.  The name you provide will be listed, and you are set as the alt.",
+	unlist = 'Usage1: /w ' .. MYNAME .. ' unlist - This removes yourself from the list. Usage2: /w ' .. MYNAME .. " unlist name - name = main character's name - This should be used from an alt to unlist your main char.  The name you provide will be removed from the list.",
+	alt = 'Usage1: /w ' .. MYNAME .. ' alt name - This sets your alt, so you can logoff your main and play your alt.  You need to list first with the list command.',
+	note = 'Usage1: /w ' .. MYNAME .. ' note text - This sets your note, so you can leave info like phone number or if you will be afk for a little bit etc.  You need to list first with the list command.',
+}
+
 local options = {
 	type='group',
 	name = NAME,
@@ -356,6 +365,8 @@ local function WhisperFilter(self, event, msg)
 		return true
 	elseif strfind(msg, addon.db.global.prefix.listrequest) == 1 then
 		return true
+	elseif strfind(msg, 'help') == 1 then
+		return true
 	end
 	
 	--you could change the msg also by doing
@@ -439,7 +450,7 @@ function addon:TimeUp()
 		if self.db.global.printlist.interval > 0 then
 			--self:Debug("Print List...")
 			if self.Count - self.printlistcount > self.db.global.printlist.interval * 60 / TIMER_INTERVAL then
-				--self:AnnounceList()
+				self:PrintList()
 				self.printlistcount = self.Count
 			end
 		end
@@ -700,6 +711,7 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 		end
 		
         local lowerMain = strlower(main);
+        --[[
         local dontList  = 0;
         if self.db.global.altlist then
           if self.db.global.altlist[lowerMain] then
@@ -709,11 +721,13 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
           end
         end 
         if dontList == 0 then
+        --]]
           local gotListed = self:ListPlayer(main, author);
   		  if (#alt > 0) and (gotListed ~= 0) then
   	        self:AltPlayer(main, alt, author)
-		  end         
-        end
+		  end
+		           
+        --end
         
 	elseif cmd == self.db.global.prefix.unlist then
 		--UNLIST whisper
@@ -727,13 +741,16 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 		self:UnlistPlayer(main, author)
 	elseif cmd == self.db.global.prefix.alt then
 		--ALT whisper
+		--"alt name" main = autor, alt = name
 		if words[2] then
 			self:AltPlayer(author, words[2], author)
 		end
 	elseif cmd == self.db.global.prefix.note then
 		--NOTE whisper
+		--"note text" main = author, note = text
 		if words[2] then
-			self:NotePlayer(author, words[2], author)
+			local notetext = unpack(words)
+			self:NotePlayer(author, notetext, author)
 		end
 	elseif cmd == self.db.global.prefix.invite then
 		--INVITE whisper
@@ -741,6 +758,8 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 	elseif cmd == self.db.global.prefix.listrequest then
 		--LISTREQUEST whisper
 		addon:Debug("LISTREQUEST is not implemented yet")
+	elseif cmd == 'help' then
+		addon:HelpPlayer(author, words[2])
 	end
 end
 
@@ -782,7 +801,8 @@ end
 function CURRENTLIST.NewList()
 	--fList.db.global.currentlist = {}
 	fList.db.global.currentlist = {
-		starttime = date("%m/%d/%y %H:%M:%S"),
+		--starttime = date("%m/%d/%y %H:%M:%S"),
+		starttime = fLib.GetTimestamp(),
 		players = {},
 		archive = {}
 	}
@@ -978,7 +998,7 @@ function addon:CloseListHandler()
 			--self.db.global.count = self.db.global.count + 1
 			--self.db.global.oldlist[self.db.global.count] = CURRENTLIST.GetPlayers()
 			local data = CURRENTLIST.GetData()
-			data.endtime = date("%m/%d/%y %H:%M:%S")
+			data.endtime = fLib.GetTimestamp()--date("%m/%d/%y %H:%M:%S")
 			tinsert(self.db.global.oldlist, data)
 		end
 		CURRENTLIST.ClearList()
@@ -1030,9 +1050,9 @@ function addon:ListPlayer(name, whispertarget)
 	
 
 	if whispertarget then
-		self:Whisper(whispertarget, msg)
+		self:Whisper(whispertarget, msg .. ' ' .. helptxtt.txt)
 	else
-		self:Whisper(name, msg)
+		self:Whisper(name, msg .. ' ' .. helptxtt.txt)
 	end
 	self:Print(msg)
     return gotListed;
@@ -1123,6 +1143,14 @@ function addon:NotePlayer(name, note, whispertarget)
 		self:Whisper(whispertarget, capname .. "'s note has been set to " .. note)
 	else
 		self:Whisper(whispertarget, "No list available")
+	end
+end
+
+function addon:HelpPlayer(name, cmd)
+	if not cmd or cmd == '' then
+		self:Whisper(name, helptxtt.help)
+	else
+		self:Whisper(name, helptxtt[cmd])
 	end
 end
 
@@ -1248,7 +1276,7 @@ function addon:PrintList()
 end
 
 --Returns the players in the current list in an array
-function addon:GetPlayers()
+function addon.GetPlayers()
 	local players = {}
 	if CURRENTLIST.IsListOpen() then
 		for idx, info in ipairs(CURRENTLIST.GetPlayers()) do
