@@ -1276,12 +1276,24 @@ function addon:PrintList()
 end
 
 --Returns the players in the current list in an array
-function addon.GetPlayers()
-	local players = {}
+function addon.GetPlayers(timestamp)
+	--local players = {}
 	if CURRENTLIST.IsListOpen() then
+		--[[
 		for idx, info in ipairs(CURRENTLIST.GetPlayers()) do
 			players[#players+1] = info.name
 		end
+		--]]
+		return fList.GetPlayersFromListObj(CURRENTLIST.GetData())
+	end
+	--return players
+	return {}
+end
+
+function addon.GetPlayersFromListObj(listobj)
+	local players = {}
+	for idx, info in ipairs(listobj.players) do
+		tinsert(players, info.name)
 	end
 	return players
 end
