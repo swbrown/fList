@@ -393,7 +393,7 @@ function addon:OnInitialize()
 	LibStub("AceConfig-3.0"):RegisterOptionsTable(NAME, options, {NAME})
 	self.BlizOptionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions(NAME, NAME)
 	
-	self:RegisterEvent("GUILD_ROSTER_UPDATE")
+	--self:RegisterEvent("GUILD_ROSTER_UPDATE")
 	self:RegisterEvent("CHAT_MSG_SYSTEM")
 	self:RegisterEvent("CHAT_MSG_WHISPER")
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER", WhisperFilter)
@@ -456,10 +456,36 @@ function addon:TimeUp()
 		end
 		
 		if GUILD_ROSTER_INTERVAL > 0 then
-			--self:Debug("Guild Roster...")
+			
+			--[[ commecting this out for fLib.Guild
 			if self.Count - self.guildrostercount > GUILD_ROSTER_INTERVAL * 60 / TIMER_INTERVAL then
 				GuildRoster()
 				self.guildrostercount = self.Count
+			end
+			--]]
+			
+			--copied over from the GUILD_ROSTER_UPDATE function below
+			for i=1,GetNumFriends(true) do
+				local name, level, class, zone, online, status, note = GetFriendInfo(i)        
+				if online then
+					online = 'yes';            
+				else
+					online = 'no';          
+				end
+				if not self.db.global.friendroster then            
+					self.db.global.friendroster = {}
+				end
+				if name then
+					self.db.global.friendroster[strlower(name)] = {
+					name = name,			
+					level = level,
+					class = class,
+					zone = zone,
+					online = online,
+					status = status,
+					note = note
+					}
+				end
 			end
 		end
 		
@@ -470,8 +496,8 @@ function addon:TimeUp()
 				self:UnlistPlayer(info.name)
 			else
 				--update info to match guild roster
+				--[[updating to use fLib.Guild
 				local rosterdata = fList.db.global.guildroster[strlower(info.name)]
-				--self:Debug("104" .. GetGuild)
 				if rosterdata then
 					info.rank = rosterdata.rank
 					info.rankIndex = rosterdata.rankIndex
@@ -504,15 +530,45 @@ function addon:TimeUp()
                       else
                         info.online = 'no';
                       end
-                    else 
-                      
                     end
                     info.status = froster.status                                
 					CURRENTLIST.SavePlayerInfo(info,false)
-                  else
-
                   end
                 end
+                --]]
+                
+                local rosterdata = fLib.Guild.GetInfo(info.name)
+                if rosterdata then
+                	info.rank = rosterdata.rank
+                	info.level = rosterdata.level
+                	info.class = rosterdata.class
+                	info.status = rosterdata.status
+                	if rosterdata.online then
+                		info.online = 'yes'
+                	else
+                		info.online = 'no'
+                	end
+                                          
+					CURRENTLIST.SavePlayerInfo(info,false)
+                else
+					local froster = self.db.global.friendroster[strlower(info.name)];
+					if froster then
+						info.rank = "NON";
+						info.rankIndex = 0;
+						info.level = froster.level;
+						info.class = froster.class;
+						info.zone = froster.zone;
+						if froster.online then
+							if froster.online == 'yes' then
+							info.online = 'yes';
+							else
+							info.online = 'no';
+							end
+						end
+						info.status = froster.status                                
+						CURRENTLIST.SavePlayerInfo(info,false)
+					end
+				end
 				
 				--TODO: remove players from list if offline for too long
 				
@@ -529,6 +585,7 @@ end
 
 --GUILD_ROSTER_UPDATE handler
 function addon:GUILD_ROSTER_UPDATE()
+--[[
 	for i=1,GetNumGuildMembers(true) do
 		local name, rank, rankIndex, level, class, zone, note, 
 			officernote, online, status, something = GetGuildRosterInfo(i)        
@@ -554,7 +611,10 @@ function addon:GUILD_ROSTER_UPDATE()
 				status = status,
 			}
 		end
-	end   
+	end
+	--]]
+	
+	--[[ moved up to TimeUp function b/c i want to get rid of this event
     for i=1,GetNumFriends(true) do
 		local name, level, class, zone, online, status, note = GetFriendInfo(i)        
         if online then
@@ -577,11 +637,14 @@ function addon:GUILD_ROSTER_UPDATE()
 			}
 		end
 	end
+	
+	-]]
 end
 
 function addon:CHAT_MSG_SYSTEM(arg1,arg2)
 	--self:Debug('<<CHAT_MSG_SYSTEM>>arg1='..tostring(arg1)..',arg2='..tostring(arg2))
 	
+	--[[  temporarily disabling this part b/c i want to use the new fLib.Guild library
 	local listOpen = CURRENTLIST.IsListOpen() ;
 	if listOpen and (strfind(arg2, 'No player named') == 1) then
 		local a = strfind(arg2,"'");
@@ -607,6 +670,8 @@ function addon:CHAT_MSG_SYSTEM(arg1,arg2)
 			end
 		end
 	end
+  --]]
+  
   
     -- Instantly delist memebers as they join
     if listOpen then
@@ -687,9 +752,12 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 	self:Debug("cmd=" .. cmd)
 	
 	--update the guildees online status if they whisper you
-	if self.db.global.guildroster[author] then
-		self.db.global.guildroster[author].online = 'yes'
-    else
+	--if self.db.global.guildroster[author] then
+	--	self.db.global.guildroster[author].online = 'yes'
+    --else
+    --temporarily commenting this part out to use fLib.Guild library
+    
+    if not fLib.Guild.GetInfo(author) then
         if self.db.global.friendroster[author] then
           self.db.global.friendroster[author].online = 'yes'
         else
@@ -846,15 +914,19 @@ function CURRENTLIST.CreatePlayerInfo(name)
 		joinlisttime = '',
 		leavelisttime = '',
 	}
-	if fList.db.global.guildroster[name] then
-		local rosterdata = fList.db.global.guildroster[name]
+	--Updating here to use fLib.Guild
+	local rosterdata = fLib.Guild.GetInfo(name)
+	if rosterdata then
+	--if fList.db.global.guildroster[name] then
+		--local rosterdata = fList.db.global.guildroster[name]
 		newplayer.rank = rosterdata.rank
-		newplayer.rankIndex = rosterdata.rankIndex
+		--newplayer.rankIndex = rosterdata.rankIndex
 		newplayer.level = rosterdata.level
 		newplayer.class = rosterdata.class
-		newplayer.zone = rosterdata.zone
+		--newplayer.zone = rosterdata.zone
 		if rosterdata.online then
-         if rosterdata.online == 'yes' then
+         --if rosterdata.online == 'yes' then
+         if rosterdata.online == 1 then
 		    newplayer.online = 'yes'
 		 else
 			newplayer.online = 'no'
@@ -863,7 +935,7 @@ function CURRENTLIST.CreatePlayerInfo(name)
 		newplayer.status = rosterdata.status	
     else
         AddFriend(name);
-        GuildRoster();
+        --GuildRoster();
         local frosterdata = fList.db.global.friendroster[name]		
         if frosterdata then
 			newplayer.level = frosterdata.level
