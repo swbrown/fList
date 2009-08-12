@@ -20,7 +20,7 @@ local CURRENTLIST = {} --table to hold functions
 addon.CURRENTLIST = CURRENTLIST
 
 local helptxtt = {
-	txt = ' /w ' .. MYNAME .. ' help for more info',
+	txt = ' /w ' .. MYNAME .. ' help for more info.  Reminder: Please remember to set your alt if you are going to switch to your alt',
 	help = 'Usage: /w ' .. MYNAME .. ' cmd [args] - Commands: list, unlist, alt, note - /w ' .. MYNAME .. ' help cmd for more info',
 	list = 'Usage1: /w ' .. MYNAME .. ' list - This adds yourself to the list. Usage2: /w ' ..MYNAME .. " list name - name = main character's name - This should be used from an alt to list your main char.  The name you provide will be listed, and you are set as the alt.",
 	unlist = 'Usage1: /w ' .. MYNAME .. ' unlist - This removes yourself from the list. Usage2: /w ' .. MYNAME .. " unlist name - name = main character's name - This should be used from an alt to unlist your main char.  The name you provide will be removed from the list.",
