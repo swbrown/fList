@@ -506,7 +506,7 @@ function addon.UpdateFromFRoster()
 				info.online = 'no'
 			end
 			
-			if info.alt then
+			if info.alt and info.alt ~= '' then
 				local altrosterdata = fLib.Guild.GetInfo(info.alt)
 				if not altrosterdata then
 					altrosterdata = fLib.Friends.GetInfo(info.alt)
@@ -973,7 +973,9 @@ function addon:ListPlayer(name, whispertarget)
 	self:Print(msg)
 	
 	--set alt
-	fList:AltPlayer(name, whispertarget, whispertarget)
+	if whispertarget ~= name then
+		fList:AltPlayer(name, whispertarget, whispertarget)
+	end
 end
 
 --Set handler for AceConfig
@@ -992,7 +994,7 @@ function addon:UnlistPlayer(name, whispertarget)
 		msg = "No list available"
 	else		
 		local info = CURRENTLIST.GetPlayerInfo(name);        
-		if info and info.alt ~= '' then
+		if info then
 			self.db.global.altlist[info.alt] = nil
 			msg = capname .. " has been removed from the list"
 		end
@@ -1211,7 +1213,7 @@ function addon.GetAltFromPlayer(name)
 end
 
 function addon.GetPlayerFromAlt(alt)
-	return self.db.global.altlist[strlower(info.alt)]
+	return fList.db.global.altlist[strlower(alt)]
 	--[[
 	for idx,info in ipairs(CURRENTLIST.GetPlayers()) do
 		if strlower(info.alt) == strlower(alt) then
