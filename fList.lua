@@ -413,12 +413,9 @@ function addon:OnInitialize()
 	self.Count = 1
 	self.announcementcount = 1
 	self.printlistcount = 1
-	self.guildrostercount = 1
 	self.Timer = self:ScheduleRepeatingTimer(self["TimeUp"], TIMER_INTERVAL, self)
 	
 	self:Debug("<<OnInitialize>> end")
-    self.db.global.guildroster = {};
-    GuildRoster();
 end
 
 --Called by AceAddon when addon enabled
@@ -470,10 +467,9 @@ function addon:TimeUp()
 						self:ExpireInvite(info.name)
 					end
 				end
-				
-				fLib.Guild.RefreshStatus(fList.UpdateFromGRoster)
 			end
 		end
+		fLib.Guild.RefreshStatus(fList.UpdateFromGRoster)
 	end
 end
 
