@@ -471,12 +471,14 @@ function addon:TimeUp()
 		end
 		fLib.Guild.RefreshStatus(fList.UpdateFromGRoster)
 	end
+	self:Debug("<<TimeUp>>", 'end')
 end
 
 function addon.UpdateFromGRoster()
 	fLib.Friends.RefreshStatus(fList.UpdateFromFRoster)
 end
 function addon.UpdateFromFRoster()
+	fList:Debug("<<UpdateFromFRoster>>")
 	for idx,info in ipairs(CURRENTLIST.GetPlayers()) do
 		--update info from fLib.Guild or fLib.Friends
 		local rosterdata = fLib.Guild.GetInfo(info.name)
@@ -686,9 +688,9 @@ function addon:PARTY_MEMBERS_CHANGED()
 	self:Debug("<<PARTY_MEMBERS_CHANGED>>" .. tostring(GetNumPartyMembers()) .. " members in the raid")
 	if GetNumPartyMembers() > 0 then
 		self:Debug('more than 0 party members')
+		self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
 		if not UnitInRaid('player') then
-			self:Debug('not in raid')
-			self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
+			self:Debug('not in raid')			
 			ConvertToRaid();
         	addon.GUI:Refresh();
         end
