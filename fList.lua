@@ -1207,7 +1207,9 @@ end
 
 function addon.GetAltFromPlayer(name)
 	local info = CURRENTLIST.GetPlayerInfo(name)
-	return info.alt
+	if info then
+		return info.alt
+	end
 end
 
 function addon.GetPlayerFromAlt(alt)
