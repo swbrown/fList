@@ -526,7 +526,7 @@ function addon.UpdateFromFRoster()
 			local tbr = false
 			if info.status == '<AFK>' or info.online == 'no' then --afk or offline
 				--check alt
-				if info.alt then --has an alt set
+				if info.alt and #info.alt > 0 then --has an alt set
 					if info.altstatus == '<AFK>' or info.altonline == 'no' then --afk or offline
 						tbr = true
 					end
@@ -551,7 +551,7 @@ function addon.UpdateFromFRoster()
 		--remove players who's to be removed flag is set
 		--aka they have been afk or offline for too long
 		if info.toberemoved and fLib.GetTimestamp() > info.toberemoved then
-			fLib:UnlistPlayer(info.name)
+			fList:UnlistPlayer(info.name)
 		end
 	end
 end
