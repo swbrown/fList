@@ -677,7 +677,12 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 		self:AcceptInvite(author)
 	elseif cmd == self.db.global.prefix.listrequest then
 		--LISTREQUEST whisper
-		addon:Debug("LISTREQUEST is not implemented yet")
+		--check author is an officer
+		if fRaid.Player.GetRank(author) == "Officer" then
+			self:PrintList()
+		else
+			self:Whisper(author, "Access Denied")
+		end
 	elseif cmd == 'help' then
 		addon:HelpPlayer(author, words[2])
 	end
