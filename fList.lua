@@ -551,6 +551,7 @@ function addon.UpdateFromFRoster()
 		--remove players who's to be removed flag is set
 		--aka they have been afk or offline for too long
 		if info.toberemoved and fLib.GetTimestamp() > info.toberemoved then
+			addon:Whisper(info.name, "auto-unlisting due to afk/offline for " .. AFK_OFFLINE_LIMIT .. " minute(s); relist when back");
 			fList:UnlistPlayer(info.name)
 		end
 	end
