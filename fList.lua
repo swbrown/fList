@@ -1192,7 +1192,11 @@ function addon:PrintList()
 		--TODO: sort list
 		local listmsg = ''--"Current list: "
 		for idx, info in ipairs(CURRENTLIST.GetPlayers()) do
-			listmsg = listmsg .. info.name .. " "
+			if info.alt and info.alt ~= '' then
+				listmsg = listmsg .. info.name .. "(" .. info.alt .. ") "
+			else
+				listmsg = listmsg .. info.name .. " "
+			end
 		end
 		if listmsg == '' then
 			listmsg = 'empty...'
