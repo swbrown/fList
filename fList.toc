@@ -3,6 +3,7 @@
 ## Description: Tamrah's list addon
 ## SavedVariables: fListDB
 ## Dependencies: fLib
+## X-Compatible-With: 40000
 
 embeds.xml
 fList.lua
