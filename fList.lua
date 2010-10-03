@@ -827,7 +827,7 @@ function CURRENTLIST.SavePlayerInfo(newplayerinfo, isnewplayer)
 					return true
 				end
 			end
-			newplayerinfo.joinlisttime = date("%m/%d/%y %H:%M:%S")
+			newplayerinfo.joinlisttime = date("!%y/%m/%d %H:%M:%S")
 			tinsert(fList.db.global.currentlist.players, newplayerinfo)
 		end
 		if fList.GUI then
@@ -861,7 +861,7 @@ function CURRENTLIST.RemovePlayerInfo(name)
 		for idx,info in ipairs(fList.db.global.currentlist.players) do
 			if name ==  info.name then
 				tremove(fList.db.global.currentlist.players, idx)
-				info.leavelisttime = date("%m/%d/%y %H:%M:%S")
+				info.leavelisttime = date("!%y/%m/%d %H:%M:%S")
 				tinsert(fList.db.global.currentlist.archive, info)
 				if fList.GUI then
 					fList.GUI:Refresh()
