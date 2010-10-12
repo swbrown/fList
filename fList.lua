@@ -1259,11 +1259,19 @@ function addon:AnnounceInChannels(msg, channels)
 end
 
 function addon:AnnounceInChat(msg, ...)
-	for i = 1, select("#", ...) do
-		local chat = select(i, ...)
-		if chat ~= "" then
-			self:Debug("Attempting to send chat to " .. chat)
-			SendChatMessage(msg, chat, nil, nil)
+	local maxMessageLength = 254
+
+	while #msg > 0 do
+
+		local messagePart = string.sub(msg, 1, maxMessageLength)
+		msg = string.sub(msg, maxMessageLength + 1, #msg)
+
+		for i = 1, select("#", ...) do
+			local chat = select(i, ...)
+			if chat ~= "" then
+				self:Debug("Attempting to send chat to " .. chat)
+				SendChatMessage(messagePart, chat, nil, nil)
+			end
 		end
 	end
 end
