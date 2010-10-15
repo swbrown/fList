@@ -450,7 +450,7 @@ function addon:TimeUp()
 		if self.db.global.printlist.interval > 0 then
 			--self:Debug("Print List...")
 			if self.Count - self.printlistcount > self.db.global.printlist.interval * 60 / TIMER_INTERVAL then
-				self:PrintList()
+				self:PrintList("")
 				self.printlistcount = self.Count
 			end
 		end
@@ -680,7 +680,7 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 		--LISTREQUEST whisper
 		--check author is an officer
 		if fRaid.Player.GetRank(author) == "Officer" or fRaid.Player.GetRank(author) == "Officer Alt" then
-			self:PrintList()
+			self:PrintList(author)
 		else
 			self:Whisper(author, "Access Denied")
 		end
@@ -1187,7 +1187,7 @@ function addon:Announce(msg)
 end
 
 --Prints the current list to specified chat and channels
-function addon:PrintList()
+function addon:PrintList(author)
 	if CURRENTLIST.IsListOpen() then
 		--TODO: sort list
 		local listmsg = ''--"Current list: "
@@ -1203,7 +1203,7 @@ function addon:PrintList()
 		else
 			listmsg = listmsg .. " " .. CURRENTLIST.Count() .. " total"
 		end
-		listmsg = 'Current list: ' .. listmsg
+		listmsg = '<' .. author .. '> Current list: ' .. listmsg
 		self:AnnounceInChannels(listmsg, {strsplit("\n", self.db.global.printlist.channels)})
 		self:AnnounceInChat(listmsg,
 			self:CreateChatList(
