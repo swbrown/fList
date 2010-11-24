@@ -227,7 +227,7 @@ function addon:RegisterGUI()
 				--Menu at the bottom
 				cat = tablet:AddCategory('columns', 1)
 				if fList.CURRENTLIST.IsListOpen() then
-					cat:AddLine('text', 'Print List', 'func', function() fList:PrintList() end)
+					cat:AddLine('text', 'Print List', 'func', function() fList:PrintList("") end)
 				end
 				cat:AddLine('text', 'Config', 'func', function() fList:OpenConfig() end)
 				cat:AddLine(
