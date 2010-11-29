@@ -679,7 +679,7 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 	elseif cmd == self.db.global.prefix.listrequest then
 		--LISTREQUEST whisper
 		--check author is an officer
-		if fRaid.Player.GetRank(author) == "Officer" or fRaid.Player.GetRank(author) == "Officer Alt" then
+		if fRaid.Player.GetRank(author) == "Officer" or fRaid.Player.GetRank(author) == "Officer Alt" or fRaid.Player.GetRank(author) == "Guild Master" then
 			self:PrintList(author)
 		else
 			self:Whisper(author, "Access Denied")
