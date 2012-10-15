@@ -670,7 +670,7 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 		--NOTE whisper
 		--"note text" main = author, note = text
 		if words[2] then
-			local notetext = unpack(words)
+			local notetext = string.sub(table.concat(words, " "), 5)
 			self:NotePlayer(author, notetext, author)
 		end
 	elseif cmd == self.db.global.prefix.invite then
