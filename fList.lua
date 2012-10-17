@@ -403,7 +403,7 @@ function addon:OnInitialize()
 	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", WhisperFilter2)
 	
 	if CURRENTLIST.IsListOpen() then
-		self:RegisterEvent("PARTY_MEMBERS_CHANGED")
+		self:RegisterEvent("GROUP_ROSTER_UPDATE")
 	end
 	
 	if fListTablet then
@@ -689,12 +689,12 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 	end
 end
 
---PARTY_MEMBERS_CHANGED handler
-function addon:PARTY_MEMBERS_CHANGED()
-	self:Debug("<<PARTY_MEMBERS_CHANGED>>" .. tostring(GetNumPartyMembers()) .. " members in the raid")
-	if GetNumPartyMembers() > 0 then
-		self:Debug('more than 0 party members')
-		self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
+--GROUP_ROSTER_UPDATE handler
+function addon:GROUP_ROSTER_UPDATE()
+	self:Debug("<<GROUP_ROSTER_UPDATE>>" .. tostring(GetNumGroupMembers()) .. " members in the raid")
+	if GetNumGroupMembers() > 0 then
+		self:Debug('more than 0 group members')
+		self:UnregisterEvent("GROUP_ROSTER_UPDATE")
 		if not UnitInRaid('player') then
 			self:Debug('not in raid')			
 			ConvertToRaid();
@@ -880,7 +880,7 @@ function addon:StartList()
 		self:Print("List has already started")
 	else
 		CURRENTLIST.NewList()
-		self:RegisterEvent("PARTY_MEMBERS_CHANGED")
+		self:RegisterEvent("GROUP_ROSTER_UPDATE")
 		self:AnnounceList()
 		self:Print("List started")
 	end
@@ -891,7 +891,7 @@ end
 function addon:CloseListHandler()
 	if CURRENTLIST.IsListOpen() then
         self.db.global.altlist = {};
-		self:UnregisterEvent("PARTY_MEMBERS_CHANGED")
+		self:UnregisterEvent("GROUP_ROSTER_UPDATE")
 		
 		--save the list in self.db.global.oldlist
 		if CURRENTLIST.Count() > 0 then
