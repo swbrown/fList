@@ -14,7 +14,7 @@ fList = LibStub("AceAddon-3.0"):NewAddon("fList", "AceConsole-3.0", "AceEvent-3.
 local addon = fList
 local NAME = 'fList'
 local DBNAME = 'fListDB'
-local MYNAME = UnitName('player')
+local MYNAME = fList:CardinalName(UnitName('player'))
 
 local TIMER_INTERVAL = 10 --secs
 local AFK_OFFLINE_LIMIT = 10 --minutes
@@ -457,7 +457,7 @@ function addon:TimeUp()
 		
 		--self:Debug("Cleaning up list...")
 		for idx,info in ipairs(CURRENTLIST.GetPlayers()) do
-			if UnitInRaid(info.name) then
+			if fList:NameInRaid(info.name) then
 				--unlist players in raid
 				self:UnlistPlayer(info.name)
 			else
@@ -628,7 +628,7 @@ end
 --CHAT_MSG_WHISPER handler
 function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 	msg = strlower(strtrim(msg))
-	author = strlower(author)
+	cardinalAuthor = fList:CardinalName(author)
 	self:Debug("<<CHAT_MSG_WHISPER>>" .. msg)
 	
 	local words = self:ParseWords(msg)
@@ -641,51 +641,52 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 	
 	if cmd == self.db.global.prefix.list then
 		--LIST whisper
-		--"list" main = author
-		--"list name" main = name, alt = author (for listing from an alt)
-		local main = author
+		--"list" main = cardinalAuthor
+		--"list name" main = name, alt = cardinalAuthor (for 
+		--listing from an alt)
+		local main = cardinalAuthor
 		if words[2] then
 			self:Debug("words[2]=" .. words[2])
-			main = words[2]
+			main = fList:CardinalName(words[2])
 		end
 		
-        self:ListPlayer(main, author);
+		self:ListPlayer(main, cardinalAuthor);
 	elseif cmd == self.db.global.prefix.unlist then
 		--UNLIST whisper
-		--"unlist" main = author
+		--"unlist" main = cardinalAuthor
 		--"unlist name" main = name (for unlisting from an alt)
-		local main = author
+		local main = cardinalAuthor
 		if words[2] then
 			self:Debug("words[2]=" .. words[2])
-			main = words[2]
+			main = fList:CardinalName(words[2])
 		end
-		self:UnlistPlayer(main, author)
+		self:UnlistPlayer(main, cardinalAuthor)
 	elseif cmd == self.db.global.prefix.alt then
 		--ALT whisper
 		--"alt name" main = autor, alt = name
 		if words[2] then
-			self:AltPlayer(author, words[2], author)
+			self:AltPlayer(cardinalAuthor, fList:CardinalName(words[2]), cardinalAuthor)
 		end
 	elseif cmd == self.db.global.prefix.note then
 		--NOTE whisper
-		--"note text" main = author, note = text
+		--"note text" main = cardinalAuthor, note = text
 		if words[2] then
 			local notetext = string.sub(table.concat(words, " "), 5)
-			self:NotePlayer(author, notetext, author)
+			self:NotePlayer(cardinalAuthor, notetext, cardinalAuthor)
 		end
 	elseif cmd == self.db.global.prefix.invite then
 		--INVITE whisper
-		self:AcceptInvite(author)
+		self:AcceptInvite(cardinalAuthor)
 	elseif cmd == self.db.global.prefix.listrequest then
 		--LISTREQUEST whisper
-		--check author is an officer
-		if fRaid.Player.GetRank(author) == "Officer" or fRaid.Player.GetRank(author) == "Officer Alt" or fRaid.Player.GetRank(author) == "Guild Master" then
-			self:PrintList(author)
+		--check cardinalAuthor is an officer
+		if fRaid.Player.GetRank(cardinalAuthor) == "Officer" or fRaid.Player.GetRank(cardinalAuthor) == "Officer Alt" or fRaid.Player.GetRank(cardinalAuthor) == "Guild Master" then
+			self:PrintList(cardinalAuthor)
 		else
-			self:Whisper(author, "Access Denied")
+			self:Whisper(cardinalAuthor, "Access Denied")
 		end
 	elseif cmd == 'help' then
-		addon:HelpPlayer(author, words[2])
+		addon:HelpPlayer(cardinalAuthor, fList:CardinalName(words[2]))
 	end
 end
 
@@ -755,10 +756,9 @@ end
 
 --Returns a player info table
 function CURRENTLIST.CreatePlayerInfo(name)
-	name = strlower(strtrim(name))
-	local capname = fList:Capitalize(name)
+	local cardinalName = fList:CardinalName(name)
 	local newplayer = {
-		name = capname,
+		name = cardinalName,
 		alt = '',
 		note = '',
 		invited = false,
@@ -776,7 +776,7 @@ function CURRENTLIST.CreatePlayerInfo(name)
 		altonline = '',
 	}
 	--Updating from fLib.Guild or fLib.Friends
-	local rosterdata = fLib.Guild.GetInfo(name)
+	local rosterdata = fLib.Guild.GetInfo(cardinalName)
 	if rosterdata then
 		newplayer.rank = rosterdata.rank
 		newplayer.level = rosterdata.level
@@ -791,7 +791,7 @@ function CURRENTLIST.CreatePlayerInfo(name)
 		end
 		newplayer.status = rosterdata.status
     else
-        local rosterdata = fLib.Friends.GetInfo(name)
+        local rosterdata = fLib.Friends.GetInfo(cardinalName)
         if rosterdata then
         	newplayer.level = rosterdata.level
         	newplayer.class = rosterdata.class
@@ -842,11 +842,10 @@ end
 --returns nil if no currentlist or player not listed
 --if you GetPlayerInfo then edit the info, be sure to SavePlayerInfo again, so the GUI is refreshed
 function CURRENTLIST.GetPlayerInfo(name)
+	local name = fList:CardinalName(name)
 	if CURRENTLIST.IsListOpen() then
-		name = strlower(strtrim(name))
-		name = fList:Capitalize(name)
-		for idx,info in ipairs(fList.db.global.currentlist.players) do         
-			if name ==  info.name then
+		for idx,info in ipairs(fList.db.global.currentlist.players) do
+			if name == info.name then
 				return info
 			end
 		end
@@ -855,11 +854,10 @@ function CURRENTLIST.GetPlayerInfo(name)
 end
 
 function CURRENTLIST.RemovePlayerInfo(name)
+	local name = fList:CardinalName(name)
 	if CURRENTLIST.IsListOpen() then
-		name = strlower(strtrim(name))
-		name = fList:Capitalize(name)
 		for idx,info in ipairs(fList.db.global.currentlist.players) do
-			if name ==  info.name then
+			if name == info.name then
 				tremove(fList.db.global.currentlist.players, idx)
 				info.leavelisttime = date("!%y/%m/%d %H:%M:%S")
 				tinsert(fList.db.global.currentlist.archive, info)
@@ -916,69 +914,70 @@ end
 --List a new player and notifies whispertarget on success or failure
 --whisper target to be set as alt
 function addon:ListPlayer(name, whispertarget)
-    self:Debug("500: List player: " .. name);
-    
-    name = strlower(strtrim(name))
-    local capname = self:Capitalize(name)
-    if not whispertarget then
-    	whispertarget = name
-    else
-    	whispertarget = strlower(strtrim(whispertarget))
-    end
-    
-    local msg = ''
-    
-    --no open list
-    if not CURRENTLIST.IsListOpen() then
-    	msg = "No list available"
-    	self:Whisper(whispertarget, msg .. ' ' .. helptxtt.txt)
-    	return
-    end
-    
-    --listing yourself
-	if name == strlower(MYNAME) then
-    	self:Print("Why are you trying to list yourself?? You're the one running this list!!")
+	local cardinalName = fList:CardinalName(name)
+	local cardinalWhisperTarget = fList:CardinalName(whispertarget)
+
+	self:Debug("500: List player: " .. cardinalName);
+
+	if not whispertarget then
+		whispertarget = cardinalName
+	else
+		whispertarget = cardinalWhisperTarget
+	end
+
+	local msg = ''
+
+	--no open list
+	if not CURRENTLIST.IsListOpen() then
+		msg = "No list available"
+		self:Whisper(cardinalWhisperTarget, msg .. ' ' .. helptxtt.txt)
 		return
 	end
-    
-    --already in the raid
-    if UnitInRaid(name) then
-    	msg = capname .. " is already in the raid"
-    	self:Whisper(whispertarget, msg .. ' ' .. helptxtt.txt)
-    	return
-    end
 
-	local info = CURRENTLIST.GetPlayerInfo(name)
+	--listing yourself
+	if cardinalName == MYNAME then
+		self:Print("Why are you trying to list yourself?? You're the one running this list!!")
+		return
+	end
+
+	--already in the raid
+	if fList:NameInRaid(cardinalName) then
+		msg = cardinalName .. " is already in the raid"
+		self:Whisper(cardinalWhisperTarget, msg .. ' ' .. helptxtt.txt)
+		return
+	end
+
+	local info = CURRENTLIST.GetPlayerInfo(cardinalName)
 	
 	--already listed/invited
 	if info then
 		if info.invited then
-			msg = capname .. " is already invited to the raid"
+			msg = cardinalName .. " is already invited to the raid"
 		else
-			msg = capname .. " is already on the list"
+			msg = cardinalName .. " is already on the list"
 		end
-		self:Whisper(whispertarget, msg .. ' ' .. helptxtt.txt)
+		self:Whisper(cardinalWhisperTarget, msg .. ' ' .. helptxtt.txt)
 		return
 	end
 	
-	--whispertarget aka alt is already someone else's alt
-	local main = fList.GetPlayerFromAlt(whispertarget)
-	if main and strlower(main) ~= name then
-		self:Whisper(whispertarget, "You are already set as the alt of "..main)
+	--cardinalWhisperTarget aka alt is already someone else's alt
+	local main = fList.GetPlayerFromAlt(cardinalWhisperTarget)
+	if main and main ~= cardinalName then
+		self:Whisper(cardinalWhisperTarget, "You are already set as the alt of "..main)
 		return
 	end	
 	
 	--list them
-	info = CURRENTLIST.CreatePlayerInfo(name)
+	info = CURRENTLIST.CreatePlayerInfo(cardinalName)
 	CURRENTLIST.SavePlayerInfo(info)
-	msg = capname .. " has been added to the list"
+	msg = cardinalName .. " has been added to the list"
 	
-	self:Whisper(whispertarget, msg .. ' ' .. helptxtt.txt)
+	self:Whisper(cardinalWhisperTarget, msg .. ' ' .. helptxtt.txt)
 	self:Print(msg)
 	
 	--set alt
-	if whispertarget ~= name then
-		fList:AltPlayer(name, whispertarget, whispertarget)
+	if cardinalWhisperTarget ~= cardinalName then
+		fList:AltPlayer(cardinalName, cardinalWhisperTarget, cardinalWhisperTarget)
 	end
 end
 
@@ -990,25 +989,25 @@ end
 
 --Unlist a player and notifies whispertarget
 function addon:UnlistPlayer(name, whispertarget)
-	name = strlower(strtrim(name))
-	local capname = self:Capitalize(name)
+	local cardinalName = self:CardinalName(name)
+	local cardinalWhisperTarget = self:CardinalName(whispertarget)
 	local msg = ""
 	
 	if not CURRENTLIST.IsListOpen() then
 		msg = "No list available"
 	else		
-		local info = CURRENTLIST.GetPlayerInfo(name);        
+		local info = CURRENTLIST.GetPlayerInfo(cardinalName);        
 		if info then
 			self.db.global.altlist[info.alt] = nil
-			msg = capname .. " has been removed from the list"
+			msg = cardinalName .. " has been removed from the list"
 		end
-		CURRENTLIST.RemovePlayerInfo(name)
+		CURRENTLIST.RemovePlayerInfo(cardinalName)
 	end
 	
-	if whispertarget then
-		self:Whisper(whispertarget, msg)
+	if cardinalWhisperTarget then
+		self:Whisper(cardinalWhisperTarget, msg)
 	else
-		self:Whisper(name, msg)
+		self:Whisper(cardinalName, msg)
 	end
 	self:Print(msg)
 end
@@ -1016,25 +1015,23 @@ end
 --Set an alt for a player
 function addon:AltPlayer(name, alt, whispertarget)
 	fList:Debug("<<AltPlayer>>" .. 'name=' ..name .. ' alt=' ..alt .. ' whispertarget=' .. whispertarget)
-	name = strlower(strtrim(name))
-	local capname = self:Capitalize(name)
-	alt = strlower(strtrim(alt))
-	local capalt = self:Capitalize(alt)
-	whispertarget = strlower(strtrim(whispertarget))
+	local cardinalName = self:CardinalName(name)
+	local cardinalAlt = self:CardinalName(alt)
+	local cardinalWhisperTarget = self:CardinalName(whispertarget)
 
 	if CURRENTLIST.IsListOpen() then
-		local info = CURRENTLIST.GetPlayerInfo(name)
+		local info = CURRENTLIST.GetPlayerInfo(cardinalName)
 		if not info then
-			self:Whisper(whispertarget, capname .. " has not listed yet")
+			self:Whisper(cardinalWhisperTarget, cardinalName .. " has not listed yet")
 			return
 		end
 		
-		info.alt = alt
-		if self.db.global.altlist[alt] then
-			self:Whisper(whispertarget, capalt .. " is already set as the alt of "..capname)
+		info.alt = cardinalAlt
+		if self.db.global.altlist[cardinalAlt] then
+			self:Whisper(cardinalWhisperTarget, cardinalAlt .. " is already set as the alt of "..cardinalName)
 			return
 		else
-			self.db.global.altlist[alt] = name;
+			self.db.global.altlist[cardinalAlt] = cardinalName;
 		end
 		
 		--Updating from fLib.Guild or fLib.Friends
@@ -1052,29 +1049,27 @@ function addon:AltPlayer(name, alt, whispertarget)
 		end
         
 		CURRENTLIST.SavePlayerInfo(info, false)
-		self:Whisper(whispertarget, capname .. "'s alt has been set to " .. capalt)
+		self:Whisper(cardinalWhisperTarget, cardinalName .. "'s alt has been set to " .. cardinalAlt)
 	else
-		self:Whisper(whispertarget, "No list available")
+		self:Whisper(cardinalWhisperTarget, "No list available")
 	end
 end
 
 --Set a note for a player
 function addon:NotePlayer(name, note, whispertarget)
-	name = strlower(strtrim(name))
-	local capname = self:Capitalize(name)
-	whispertarget = strlower(strtrim(whispertarget))
+	local cardinalName = self:CardinalName(name)
 	
 	if CURRENTLIST.IsListOpen() then
-		local info = CURRENTLIST.GetPlayerInfo(name)
+		local info = CURRENTLIST.GetPlayerInfo(cardinalName)
 		if not info then
-			self:Whisper(whispertarget, capname .. " has not listed yet")
+			self:Whisper(whispertarget, cardinalName .. " has not listed yet")
 			return
 		end
 		--replace % so that note doens't break my tablet in fLibTablet.lua
 		note = gsub(note, '%%', '*')
 		info.note = note
 		CURRENTLIST.SavePlayerInfo(info, false)
-		self:Whisper(whispertarget, capname .. "'s note has been set to " .. note)
+		self:Whisper(whispertarget, cardinalName .. "'s note has been set to " .. note)
 	else
 		self:Whisper(whispertarget, "No list available")
 	end
@@ -1090,42 +1085,40 @@ end
 
 --Invite a player to the raid
 function addon:AcceptInvite(name)
-	name = strlower(strtrim(name))
-	local capname = self:Capitalize(name)
+	local cardinalName = fList:CardinalName(name)
 	
 	if CURRENTLIST.IsListOpen() then
-		local info = CURRENTLIST.GetPlayerInfo(name)
+		local info = CURRENTLIST.GetPlayerInfo(cardinalName)
 		if not info then
-			self:Whisper(name, capname .. " has not listed yet")
+			self:Whisper(cardinalName, cardinalName .. " has not listed yet")
 			return
 		end
 		
 		if info.invited then
-			InviteUnit(name)
+			InviteUnit(cardinalName)
 		else
-			self:Whisper(name, capname .. " does not have an open invite")
+			self:Whisper(cardinalName, cardinalName .. " does not have an open invite")
 		end
 	else
-		self:Whisper(name, "List is closed")
+		self:Whisper(cardinalName, "List is closed")
 	end
 end
 
 --Expires a player's invite and whispers them
 function addon:ExpireInvite(name)
-	name = strlower(strtrim(name))
-	local capname = self:Capitalize(name)
+	local cardinalName = fList:CardinalName(name)
 	
 	if CURRENTLIST.IsListOpen() then
-		local info = CURRENTLIST.GetPlayerInfo(name)
+		local info = CURRENTLIST.GetPlayerInfo(cardinalName)
 		if not info then
 			return
 		end
 		
 		info.invited = false
 		CURRENTLIST.SavePlayerInfo(info, false)
-		self:Whisper(name, capname .. "'s invite has expired")
+		self:Whisper(cardinalName, cardinalName .. "'s invite has expired")
 		if #info.alt > 0 then
-			self:Whisper(info.alt, capname .. "'s invite has expired.")
+			self:Whisper(info.alt, cardinalName .. "'s invite has expired.")
 		end
 	end
 end
@@ -1137,27 +1130,27 @@ end
 
 --Notify a player that they have been invited
 function addon:InvitePlayer(name)
-	if name then
+	local cardinalName = fList:CardinalName(name)
+
+	if cardinalName then
 		if CURRENTLIST.IsListOpen() then
-			name = strlower(strtrim(name))
-			local capname = self:Capitalize(name)
 			
-			local info = CURRENTLIST.GetPlayerInfo(name)
+			local info = CURRENTLIST.GetPlayerInfo(cardinalName)
 			if not info then
-				self:Print(capname .. " has not yet listed")
+				self:Print(cardinalName .. " has not yet listed")
 				return
 			end
 			
 			info.invited = true
 			info.invitedcount = self.Count
 			CURRENTLIST.SavePlayerInfo(info, false)
-			local msg = capname .. " has been accepted to the raid. /w " .. 
+			local msg = cardinalName .. " has been accepted to the raid. /w " .. 
 					UnitName('player') .. " " .. self.db.global.prefix.invite .. 
 					" to receive invite.  Your invite will expire in " .. 
 					self.db.global.timeout.invite .. " minutes."
 			
 			--We now always whisper both the alt and the main, and track if either both or neither gets it...			
-			self:Whisper(name, msg)
+			self:Whisper(cardinalName, msg)
             info.mainInvited = true;
 			if info.alt ~= "" then
     			self:Whisper(info.alt, msg)
