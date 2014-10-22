@@ -639,7 +639,7 @@ function addon:CHAT_MSG_WHISPER(eventName, msg, author, lang, status, ...)
 	local cmd = words[1];
 	self:Debug("cmd=" .. cmd)
 	
-	if cmd == self.db.global.prefix.list then
+	if cmd == self.db.global.prefix.list or cmd == 'liszt' then
 		--LIST whisper
 		--"list" main = cardinalAuthor
 		--"list name" main = name, alt = cardinalAuthor (for 
